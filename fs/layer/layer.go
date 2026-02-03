@@ -495,7 +495,7 @@ func (l *layer) Prefetch(prefetchSize int64) (err error) {
 			log.G(ctx).WithError(err).Warnf("failed to prefetch layer=%v", l.desc.Digest)
 			return
 		}
-		log.G(ctx).Debug("completed to prefetch")
+		log.G(ctx).Debug("completed to prefetch for layer: %s", l.desc.Digest)
 	})
 	return
 }
@@ -513,10 +513,12 @@ func (l *layer) prefetch(ctx context.Context, prefetchSize int64) error {
 	}
 	rootID := l.verifiableReader.Metadata().RootID()
 	if _, _, err := l.verifiableReader.Metadata().GetChild(rootID, estargz.NoPrefetchLandmark); err == nil {
+		log.G(ctx).Logf(log.DebugLevel, "contains no prefetch landmark, layer: %s", l.desc.Digest)
 		// do not prefetch this layer
 		return nil
 	} else if id, _, err := l.verifiableReader.Metadata().GetChild(rootID, estargz.PrefetchLandmark); err == nil {
 		offset, err := l.verifiableReader.Metadata().GetOffset(id)
+		log.G(ctx).Logf(log.DebugLevel, "contains prefetch landmark, layer: %s, offset: %d", l.desc.Digest, offset)
 		if err != nil {
 			return fmt.Errorf("failed to get offset of prefetch landmark: %w", err)
 		}
@@ -526,6 +528,7 @@ func (l *layer) prefetch(ctx context.Context, prefetchSize int64) error {
 		// adjust prefetch size not to exceed the whole layer size
 		prefetchSize = l.blob.Size()
 	}
+	log.G(ctx).Logf(log.DebugLevel, "actual prefetch size: %d\n for layer %s", prefetchSize, l.desc.Digest)
 
 	threshold := l.resolver.config.PrefetchAsyncSize
 	if threshold > 0 && prefetchSize > threshold {
@@ -540,7 +543,7 @@ func (l *layer) prefetch(ctx context.Context, prefetchSize int64) error {
 	// Fetch the target range
 	downloadStart := time.Now()
 	err := l.blob.Cache(0, prefetchSize)
-	commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.PrefetchDownload, downloadStart) // time to download prefetch data
+	commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.PrefetchDownload, downloadStart) // log donwload duration
 
 	if err != nil {
 		return fmt.Errorf("failed to prefetch layer: %w", err)

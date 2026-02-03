@@ -267,6 +267,7 @@ func (r *LayerManager) resolveLayer(ctx context.Context, refspec reference.Spec,
 		go func() {
 			r.backgroundTaskManager.DoPrioritizedTask()
 			defer r.backgroundTaskManager.DonePrioritizedTask()
+			log.G(ctx).Logf(log.DebugLevel, "[Manager] calling prefetch for layer %s with prefetchSize %d", l.Info().Digest.String(), r.prefetchSize)
 			if err := l.Prefetch(r.prefetchSize); err != nil {
 				log.G(ctx).WithError(err).Debug("failed to prefetched layer")
 				return

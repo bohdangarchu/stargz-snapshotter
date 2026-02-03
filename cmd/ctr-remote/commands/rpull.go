@@ -139,6 +139,7 @@ func pull(ctx context.Context, client *containerd.Client, ref string, config *rP
 
 	var labelHandler func(h images.Handler) images.Handler
 	prefetchSize := int64(10 * 1024 * 1024)
+	// override with default prefetch size if annotation not set
 	if config.containerdLabels {
 		labelHandler = source.AppendExtraLabelsHandler(prefetchSize, ctdsnapshotters.AppendInfoHandlerWrapper(ref))
 	} else {

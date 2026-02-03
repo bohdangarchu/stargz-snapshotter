@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/containerd/log"
 	"github.com/containerd/stargz-snapshotter/fs/config"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -231,7 +232,9 @@ func AppendExtraLabelsHandler(prefetchSize int64, wrapper func(images.Handler) i
 						c.Annotations[targetURLsLabel] = appendWithValidation(targetURLsLabel, c.URLs)
 					}
 
+					// overridden with default size if not set
 					if _, ok := c.Annotations[config.TargetPrefetchSizeLabel]; !ok { // nop if this key is already set
+						log.G(ctx).Logf(log.DebugLevel, "setting annotation to: %d\n", prefetchSize)
 						c.Annotations[config.TargetPrefetchSizeLabel] = fmt.Sprintf("%d", prefetchSize)
 					}
 
