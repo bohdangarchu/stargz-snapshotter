@@ -76,6 +76,10 @@ const (
 	// urls of the layer descriptor.
 	targetImageURLsLabelPrefix = "containerd.io/snapshot/remote/urls."
 
+	// targetImagePrefetchSizeLabelPrefix is a label prefix which constructs a map from the layer index to
+	// prefetch size of the layer descriptor.
+	targetImagePrefetchSizeLabelPrefix = "containerd.io/snapshot/remote/stargz.prefetch."
+
 	// targetURsLLabel is a label which contains layer URL. This is only used to pass URL from containerd
 	// to snapshotter.
 	targetURLsLabel = "containerd.io/snapshot/remote/urls"
@@ -115,6 +119,11 @@ func FromDefaultLabels(hosts RegistryHosts) GetSources {
 					desc := ocispec.Descriptor{Digest: d}
 					if urls, ok := labels[targetImageURLsLabelPrefix+fmt.Sprintf("%d", i)]; ok {
 						desc.URLs = strings.Split(urls, ",")
+					}
+					if prefetchSize, ok := labels[targetImagePrefetchSizeLabelPrefix+fmt.Sprintf("%d", i)]; ok {
+						desc.Annotations = map[string]string{
+							config.TargetPrefetchSizeLabel: prefetchSize,
+						}
 					}
 					neighboringLayers = append(neighboringLayers, desc)
 				}
@@ -255,6 +264,15 @@ func AppendExtraLabelsHandler(prefetchSize int64, wrapper func(images.Handler) i
 						urlsKey := targetImageURLsLabelPrefix + fmt.Sprintf("%d", j)
 						if _, ok := c.Annotations[urlsKey]; !ok { // nop if this key is already set
 							c.Annotations[urlsKey] = appendWithValidation(urlsKey, l.URLs)
+						}
+						// Store prefetch size of the neighbouring layer as well.
+						prefetchKey := targetImagePrefetchSizeLabelPrefix + fmt.Sprintf("%d", j)
+						if _, ok := c.Annotations[prefetchKey]; !ok { // nop if this key is already set
+							if ps, ok := l.Annotations[config.TargetPrefetchSizeLabel]; ok {
+								c.Annotations[prefetchKey] = ps
+							} else {
+								c.Annotations[prefetchKey] = fmt.Sprintf("%d", prefetchSize)
+							}
 						}
 					}
 				}

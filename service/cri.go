@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/containerd/stargz-snapshotter/fs/config"
 	"github.com/containerd/stargz-snapshotter/fs/source"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -47,6 +48,10 @@ const (
 	// urls of the layer descriptor. This isn't contained in the set of the labels passed from CRI plugin but
 	// some clients (e.g. nerdctl) passes this for preserving url field in the OCI descriptor.
 	targetImageURLsLabelPrefix = "containerd.io/snapshot/remote/urls."
+
+	// targetImagePrefetchSizeLabelPrefix is a label prefix which constructs a map from the layer index to
+	// prefetch size of the layer descriptor.
+	targetImagePrefetchSizeLabelPrefix = "containerd.io/snapshot/remote/stargz.prefetch."
 
 	// targetURsLLabel is a label which contains layer URL. This is only used to pass URL from containerd
 	// to snapshotter. This isn't contained in the set of the labels passed from CRI plugin but
@@ -86,6 +91,11 @@ func sourceFromCRILabels(hosts source.RegistryHosts) source.GetSources {
 					desc := ocispec.Descriptor{Digest: d}
 					if urls, ok := labels[targetImageURLsLabelPrefix+fmt.Sprintf("%d", i)]; ok {
 						desc.URLs = strings.Split(urls, ",")
+					}
+					if prefetchSize, ok := labels[targetImagePrefetchSizeLabelPrefix+fmt.Sprintf("%d", i)]; ok {
+						desc.Annotations = map[string]string{
+							config.TargetPrefetchSizeLabel: prefetchSize,
+						}
 					}
 					neighboringLayers = append(neighboringLayers, desc)
 				}
