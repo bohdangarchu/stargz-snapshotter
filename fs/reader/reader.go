@@ -237,7 +237,7 @@ func (vr *VerifiableReader) readAndCache(id uint32, fr io.Reader, chunkOffset, c
 	}
 
 	// Check if it already exists in the cache
-	cacheID := genID(id, chunkOffset, chunkSize)
+	cacheID := genID(gr.tocVersion, id, chunkOffset, chunkSize)
 	if r, err := gr.cache.Get(cacheID); err == nil {
 		r.Close()
 		return nil
@@ -308,8 +308,9 @@ func (vr *VerifiableReader) isClosed() bool {
 // to use for verifying file or chunk contained in this stargz blob.
 func NewReader(r metadata.Reader, cache cache.BlobCache, layerSha digest.Digest) (*VerifiableReader, error) {
 	vr := &reader{
-		r:     r,
-		cache: cache,
+		r:          r,
+		cache:      cache,
+		tocVersion: r.TOCDigest().String(),
 		bufPool: sync.Pool{
 			New: func() interface{} {
 				return new(bytes.Buffer)
@@ -322,9 +323,10 @@ func NewReader(r metadata.Reader, cache cache.BlobCache, layerSha digest.Digest)
 }
 
 type reader struct {
-	r       metadata.Reader
-	cache   cache.BlobCache
-	bufPool sync.Pool
+	r          metadata.Reader
+	cache      cache.BlobCache
+	tocVersion string // TOC digest string incorporated into cache keys for namespacing
+	bufPool    sync.Pool
 
 	layerSha digest.Digest
 
@@ -362,7 +364,7 @@ func (gr *reader) OpenFile(id uint32) (io.ReaderAt, error) {
 	var fr metadata.File
 	fr, err := gr.r.OpenFileWithPreReader(id, func(nid uint32, chunkOffset, chunkSize int64, chunkDigest string, r io.Reader) error {
 		// Check if it already exists in the cache
-		cacheID := genID(nid, chunkOffset, chunkSize)
+		cacheID := genID(gr.tocVersion, nid, chunkOffset, chunkSize)
 		if r, err := gr.cache.Get(cacheID); err == nil {
 			r.Close()
 			return nil
@@ -436,7 +438,7 @@ func (sf *file) ReadAt(p []byte, offset int64) (int, error) {
 			break
 		}
 		var (
-			id           = genID(sf.id, chunkOffset, chunkSize)
+			id           = genID(sf.gr.tocVersion, sf.id, chunkOffset, chunkSize)
 			lowerDiscard = positive(offset - chunkOffset)
 			upperDiscard = positive(chunkOffset + chunkSize - (offset + int64(len(p))))
 			expectedSize = chunkSize - upperDiscard - lowerDiscard
@@ -529,7 +531,7 @@ func (sf *file) GetPassthroughFd(mergeBufferSize int64, mergeWorkerCount int) (u
 		offset = chunkOffset + chunkSize
 	}
 
-	id := genID(sf.id, 0, totalSize)
+	id := genID(sf.gr.tocVersion, sf.id, 0, totalSize)
 
 	// cache.PassThrough() is necessary to take over files
 	r, err := sf.gr.cache.Get(id, cache.PassThrough())
@@ -579,7 +581,7 @@ func (sf *file) prefetchEntireFileSequential(entireCacheID string) error {
 			break
 		}
 
-		id := genID(sf.id, chunkOffset, chunkSize)
+		id := genID(sf.gr.tocVersion, sf.id, chunkOffset, chunkSize)
 		b := sf.gr.bufPool.Get().(*bytes.Buffer)
 		b.Reset()
 		b.Grow(int(chunkSize))
@@ -758,7 +760,7 @@ func (sf *file) processBatchChunks(args *batchWorkerArgs) error {
 		chunk := args.chunks[chunkIdx]
 		bufStart := args.buffer[chunk.bufferPos : chunk.bufferPos+chunk.size]
 
-		id := genID(sf.id, chunk.offset, chunk.size)
+		id := genID(sf.gr.tocVersion, sf.id, chunk.offset, chunk.size)
 		if r, err := sf.gr.cache.Get(id); err == nil {
 			n, err := r.ReadAt(bufStart, 0)
 			r.Close()
@@ -840,8 +842,8 @@ func (gr *reader) verifyChunk(id uint32, p []byte, chunkDigestStr string) error 
 	return nil
 }
 
-func genID(id uint32, offset, size int64) string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%d-%d-%d", id, offset, size)))
+func genID(tocVersion string, id uint32, offset, size int64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%d-%d-%d", tocVersion, id, offset, size)))
 	return fmt.Sprintf("%x", sum)
 }
 

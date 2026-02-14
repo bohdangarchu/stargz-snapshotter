@@ -66,6 +66,10 @@ type FileSystem interface {
 	Mount(ctx context.Context, mountpoint string, labels map[string]string) error
 	Check(ctx context.Context, mountpoint string, labels map[string]string) error
 	Unmount(ctx context.Context, mountpoint string) error
+	// RefreshTOC re-fetches the external TOC and blob for the layer at the given mountpoint,
+	// rebuilds internal data structures, and atomically swaps the active reader.
+	// Existing open file handles will return EIO, forcing re-open.
+	RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error
 }
 
 // SnapshotterConfig is used to configure the remote snapshotter instance

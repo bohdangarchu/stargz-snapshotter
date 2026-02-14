@@ -91,5 +91,12 @@ func (l *breakableLayer) Refresh(ctx context.Context, hosts source.RegistryHosts
 	}
 	return nil
 }
-func (l *breakableLayer) Done()        {}
-func (l *breakableLayer) Close() error { return nil }
+func (l *breakableLayer) RefreshTOC(ctx context.Context, hosts source.RegistryHosts, refspec reference.Spec, desc ocispec.Descriptor) error {
+	if !l.success {
+		return fmt.Errorf("failed")
+	}
+	return nil
+}
+func (l *breakableLayer) SetFUSEFs(f interface{}) {}
+func (l *breakableLayer) Done()                   {}
+func (l *breakableLayer) Close() error             { return nil }

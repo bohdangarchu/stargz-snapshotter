@@ -139,3 +139,8 @@ func (cli *Client) Unmount(ctx context.Context, mountpoint string) error {
 
 	return nil
 }
+
+func (cli *Client) RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error {
+	// RefreshTOC is not supported via the FUSE manager client.
+	return fmt.Errorf("RefreshTOC is not supported via the FUSE manager")
+}

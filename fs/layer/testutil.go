@@ -875,7 +875,7 @@ func hasFileDigest(filename string, digest string) check {
 			t.Fatalf("failed to get node %q: %v", filename, err)
 		}
 		ni := n.Operations().(*node)
-		attr, err := ni.fs.r.Metadata().GetAttr(ni.id)
+		attr, err := ni.fs.r().Metadata().GetAttr(ni.id)
 		if err != nil {
 			t.Fatalf("failed to get attr %q(%d): %v", filename, ni.id, err)
 		}

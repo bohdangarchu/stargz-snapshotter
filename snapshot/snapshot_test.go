@@ -418,6 +418,10 @@ func (fs *bindFs) Unmount(ctx context.Context, mountpoint string) error {
 	return syscall.Unmount(mountpoint, 0)
 }
 
+func (fs *bindFs) RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error {
+	return fmt.Errorf("not implemented")
+}
+
 func dummyFileSystem() FileSystem { return &dummyFs{} }
 
 type dummyFs struct{}
@@ -431,6 +435,10 @@ func (fs *dummyFs) Check(ctx context.Context, mountpoint string, labels map[stri
 }
 
 func (fs *dummyFs) Unmount(ctx context.Context, mountpoint string) error {
+	return fmt.Errorf("dummy")
+}
+
+func (fs *dummyFs) RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error {
 	return fmt.Errorf("dummy")
 }
 

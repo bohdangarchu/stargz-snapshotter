@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/stargz-snapshotter/fusemanager"
 	"github.com/containerd/stargz-snapshotter/service"
 	"github.com/containerd/stargz-snapshotter/service/keychain/keychainconfig"
+	"github.com/containerd/stargz-snapshotter/service/refreshtoc"
 	snbase "github.com/containerd/stargz-snapshotter/snapshot"
 	"github.com/containerd/stargz-snapshotter/version"
 	sddaemon "github.com/coreos/go-systemd/v22/daemon"
@@ -154,7 +155,10 @@ func main() {
 		ImageServicePath:           config.ImageServicePath,
 	}
 
-	var rs snapshots.Snapshotter
+	var (
+		rs    snapshots.Snapshotter
+		sfsys snbase.FileSystem // filesystem for RefreshTOC service
+	)
 	fuseManagerConfig := config.FuseManagerConfig
 	if fuseManagerConfig.Enable {
 		fmPath := fuseManagerConfig.Path
@@ -185,10 +189,11 @@ func main() {
 			DefaultImageServiceAddress: defaultImageServiceAddress,
 		}
 
-		fs, err := fusemanager.NewManagerClient(ctx, *rootDir, fmAddr, &fuseManagerConfig)
+		fmFs, err := fusemanager.NewManagerClient(ctx, *rootDir, fmAddr, &fuseManagerConfig)
 		if err != nil {
 			log.G(ctx).WithError(err).Fatalf("failed to configure fusemanager")
 		}
+		sfsys = fmFs
 		flags := []snbase.Opt{snbase.AsynchronousRemove}
 		// "managerNewlyStarted" being true indicates that the FUSE manager is newly started. To
 		// fully recover the snapshotter and the FUSE manager's state, we need to restore
@@ -197,7 +202,7 @@ func main() {
 		if !managerNewlyStarted {
 			flags = append(flags, snbase.NoRestore)
 		}
-		rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fs, flags...)
+		rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fmFs, flags...)
 		if err != nil {
 			log.G(ctx).WithError(err).Fatalf("failed to configure snapshotter")
 		}
@@ -253,12 +258,24 @@ func main() {
 			log.G(ctx).WithError(err).Fatalf("failed to configure fs config")
 		}
 
-		rs, err = service.NewStargzSnapshotterService(ctx, *rootDir, &config.Config,
+		sfsys, err = service.NewFileSystem(ctx, *rootDir, &config.Config,
 			service.WithCredsFuncs(credsFuncs...), service.WithFilesystemOptions(fsOpts...))
+		if err != nil {
+			log.G(ctx).WithError(err).Fatalf("failed to configure filesystem")
+		}
+
+		snOpts := []snbase.Opt{snbase.AsynchronousRemove}
+		if config.AllowInvalidMountsOnRestart {
+			snOpts = append(snOpts, snbase.AllowInvalidMountsOnRestart)
+		}
+		rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), sfsys, snOpts...)
 		if err != nil {
 			log.G(ctx).WithError(err).Fatalf("failed to configure snapshotter")
 		}
 	}
+
+	// Register the RefreshTOC service for dynamic external TOC replacement
+	refreshtoc.RegisterRefreshTOCServiceServer(rpc, refreshtoc.NewService(sfsys, rs))
 
 	cleanup, err := serve(ctx, rpc, *address, rs, config)
 	if err != nil {

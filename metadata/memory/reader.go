@@ -18,6 +18,7 @@ package memory
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io"
 	"math"
 	"os"
@@ -74,7 +75,14 @@ func NewReader(sr *io.SectionReader, opts ...metadata.Option) (metadata.Reader, 
 	if !ok {
 		return nil, fmt.Errorf("failed to get root node")
 	}
-	rootID, idMap, idOfEntry, err := assignIDs(er, root)
+	var rootID uint32
+	var idMap map[uint32]*estargz.TOCEntry
+	var idOfEntry map[string]uint32
+	if rOpts.StableIDs {
+		rootID, idMap, idOfEntry, err = assignIDsStable(er, root)
+	} else {
+		rootID, idMap, idOfEntry, err = assignIDs(er, root)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +136,58 @@ func assignIDs(er *estargz.Reader, e *estargz.TOCEntry) (rootID uint32, idMap ma
 		return 0, nil, nil, err
 	}
 
+	return rootID, idMap, idOfEntry, nil
+}
+
+// assignIDsStable assigns deterministic IDs to each TOC entry based on path hash.
+// This ensures FUSE inode numbers remain stable across TOC swaps when the file tree stays the same.
+func assignIDsStable(er *estargz.Reader, root *estargz.TOCEntry) (rootID uint32, idMap map[uint32]*estargz.TOCEntry, idOfEntry map[string]uint32, err error) {
+	idMap = make(map[uint32]*estargz.TOCEntry)
+	idOfEntry = make(map[string]uint32)
+
+	stableID := func(name string) uint32 {
+		h := fnv.New32a()
+		h.Write([]byte(name))
+		// Keep below MaxUint32-3 to leave room for reserved inodes (0, 1, 2)
+		return h.Sum32() & 0x7FFFFFFC
+	}
+
+	var mapChildren func(e *estargz.TOCEntry) (uint32, error)
+	mapChildren = func(e *estargz.TOCEntry) (uint32, error) {
+		if e.Type == "hardlink" {
+			return 0, fmt.Errorf("unexpected type \"hardlink\": this should be replaced to the destination entry")
+		}
+
+		if existingID, ok := idOfEntry[e.Name]; ok {
+			return existingID, nil
+		}
+
+		id := stableID(e.Name)
+		// Linear probing for hash collisions
+		for {
+			if existing, ok := idMap[id]; ok && existing.Name != e.Name {
+				id = (id + 1) & 0x7FFFFFFC
+				continue
+			}
+			break
+		}
+		idMap[id] = e
+		idOfEntry[e.Name] = id
+
+		e.ForeachChild(func(_ string, ent *estargz.TOCEntry) bool {
+			_, err = mapChildren(ent)
+			return err == nil
+		})
+		if err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+
+	rootID, err = mapChildren(root)
+	if err != nil {
+		return 0, nil, nil, err
+	}
 	return rootID, idMap, idOfEntry, nil
 }
 

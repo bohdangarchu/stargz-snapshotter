@@ -432,6 +432,34 @@ func (fs *filesystem) check(ctx context.Context, l layer.Layer, labels map[strin
 	return rErr
 }
 
+func (fs *filesystem) RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error {
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("mountpoint", mountpoint))
+
+	fs.layerMu.Lock()
+	l := fs.layer[mountpoint]
+	fs.layerMu.Unlock()
+	if l == nil {
+		return fmt.Errorf("layer not registered for mountpoint %q", mountpoint)
+	}
+
+	src, err := fs.getSources(labels)
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
+
+	var lastErr error
+	for _, s := range src {
+		if err := l.RefreshTOC(ctx, s.Hosts, s.Name, s.Target); err == nil {
+			log.G(ctx).Info("successfully refreshed TOC")
+			return nil
+		} else {
+			lastErr = err
+			log.G(ctx).WithError(err).Warnf("failed to refresh TOC from %q", s.Name)
+		}
+	}
+	return fmt.Errorf("failed to refresh TOC for all sources: %w", lastErr)
+}
+
 func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
 	if mountpoint == "" {
 		return fmt.Errorf("mount point must be specified")

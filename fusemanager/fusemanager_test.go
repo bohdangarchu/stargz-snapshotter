@@ -78,6 +78,10 @@ func (fs *mockFileSystem) Unmount(ctx context.Context, mountpoint string) error 
 	return nil
 }
 
+func (fs *mockFileSystem) RefreshTOC(ctx context.Context, mountpoint string, labels map[string]string) error {
+	return fmt.Errorf("not implemented")
+}
+
 // mockServer embeds Server struct and overrides Init method
 type mockServer struct {
 	*Server

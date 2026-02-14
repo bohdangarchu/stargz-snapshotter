@@ -97,6 +97,7 @@ type Options struct {
 	TOCOffset     int64
 	Telemetry     *Telemetry
 	Decompressors []Decompressor
+	StableIDs     bool // Use deterministic path-based IDs for stable FUSE inodes across TOC swaps
 }
 
 // Option is an option to configure the behaviour of reader.
@@ -123,6 +124,16 @@ func WithTelemetry(telemetry *Telemetry) Option {
 func WithDecompressors(decompressors ...Decompressor) Option {
 	return func(o *Options) error {
 		o.Decompressors = decompressors
+		return nil
+	}
+}
+
+// WithStableIDs option enables deterministic path-based ID assignment.
+// This ensures that FUSE inode numbers remain stable across TOC swaps
+// when the file tree structure stays the same.
+func WithStableIDs() Option {
+	return func(o *Options) error {
+		o.StableIDs = true
 		return nil
 	}
 }

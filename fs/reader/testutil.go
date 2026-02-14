@@ -163,7 +163,7 @@ func testFileReadAt(t *TestRunner, factory metadata.Store) {
 								defer closeFn()
 								f.fr = newExceptFile(t, f.fr, cacheExcept...)
 								for _, reg := range cacheExcept {
-									id := genID(f.id, reg.b, reg.e-reg.b+1)
+									id := genID(f.gr.tocVersion, f.id, reg.b, reg.e-reg.b+1)
 									w, err := f.gr.cache.Add(id)
 									if err != nil {
 										w.Close()
@@ -202,7 +202,7 @@ func testFileReadAt(t *TestRunner, factory metadata.Store) {
 										break
 									}
 									data := make([]byte, chunkSize)
-									id := genID(f.id, chunkOffset, chunkSize)
+									id := genID(f.gr.tocVersion, f.id, chunkOffset, chunkSize)
 									r, err := f.gr.cache.Get(id)
 									if err != nil {
 										t.Errorf("missed cache of offset=%d, size=%d: %v(got size=%d)", chunkOffset, chunkSize, err, n)
@@ -805,7 +805,7 @@ func hasFileContentsWithPreCached(name string, off int64, contents string, extra
 			if err != nil {
 				t.Fatalf("failed to lookup %q", e.name)
 			}
-			cacheID := genID(eid, e.chunkOffset, e.chunkSize)
+			cacheID := genID(r.tocVersion, eid, e.chunkOffset, e.chunkSize)
 			er, err := r.cache.Get(cacheID)
 			if err != nil {
 				t.Fatalf("failed to get cache %q: %+v", cacheID, e)

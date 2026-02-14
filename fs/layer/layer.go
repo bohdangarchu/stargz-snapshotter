@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/stargz-snapshotter/cache"
 	"github.com/containerd/stargz-snapshotter/estargz"
 	"github.com/containerd/stargz-snapshotter/estargz/zstdchunked"
+	esgzexternaltoc "github.com/containerd/stargz-snapshotter/nativeconverter/estargz/externaltoc"
 	"github.com/containerd/stargz-snapshotter/fs/config"
 	commonmetrics "github.com/containerd/stargz-snapshotter/fs/metrics/common"
 	"github.com/containerd/stargz-snapshotter/fs/reader"
@@ -84,6 +85,13 @@ type Layer interface {
 
 	// Refresh refreshes the layer connection.
 	Refresh(ctx context.Context, hosts source.RegistryHosts, refspec reference.Spec, desc ocispec.Descriptor) error
+
+	// RefreshTOC re-fetches the external TOC and blob, rebuilds internal data structures,
+	// and atomically swaps the active reader. Open file handles return EIO after swap.
+	RefreshTOC(ctx context.Context, hosts source.RegistryHosts, refspec reference.Spec, desc ocispec.Descriptor) error
+
+	// SetFUSEFs wires up the FUSE filesystem reference for dynamic TOC swapping.
+	SetFUSEFs(fuseFs interface{})
 
 	// Verify verifies this layer using the passed TOC Digest.
 	// Nop if Verify() or SkipVerify() was already called.
@@ -429,6 +437,7 @@ type layer struct {
 	backgroundFetchOnce sync.Once
 	passThrough         passThroughConfig
 	logFileAccess       bool
+	fuseFs              interface{} // *fs from node.go, for dynamic TOC swapping
 }
 
 func (l *layer) Info() Info {
@@ -465,6 +474,95 @@ func (l *layer) Refresh(ctx context.Context, hosts source.RegistryHosts, refspec
 		return fmt.Errorf("layer is already closed")
 	}
 	return l.blob.Refresh(ctx, hosts, refspec, desc)
+}
+
+func (l *layer) SetFUSEFs(fuseFs interface{}) {
+	l.fuseFs = fuseFs
+}
+
+func (l *layer) RefreshTOC(ctx context.Context, hosts source.RegistryHosts, refspec reference.Spec, desc ocispec.Descriptor) error {
+	if l.isClosed() {
+		return fmt.Errorf("layer is already closed")
+	}
+
+	log.G(ctx).Infof("refreshing TOC for layer %v", l.desc.Digest)
+
+	// 1. Resolve a new blob (allows size change)
+	newHttpCache, err := newCache(filepath.Join(l.resolver.rootDir, "httpcache"), l.resolver.config.HTTPCacheType, l.resolver.config)
+	if err != nil {
+		return fmt.Errorf("failed to create new http cache: %w", err)
+	}
+	newBlobObj, err := l.resolver.resolver.Resolve(ctx, hosts, refspec, desc, newHttpCache)
+	if err != nil {
+		newHttpCache.Close()
+		return fmt.Errorf("failed to resolve new blob: %w", err)
+	}
+
+	// 2. Build new SectionReader over the new blob
+	sr := io.NewSectionReader(readerAtFunc(func(p []byte, offset int64) (n int, err error) {
+		l.resolver.backgroundTaskManager.DoPrioritizedTask()
+		defer l.resolver.backgroundTaskManager.DonePrioritizedTask()
+		return newBlobObj.ReadAt(p, offset)
+	}), 0, newBlobObj.Size())
+
+	// 3. Build new metadata reader with stable IDs and fresh external TOC decompressor
+	additionalDecompressors := []metadata.Decompressor{new(zstdchunked.Decompressor)}
+	if l.resolver.additionalDecompressors != nil {
+		additionalDecompressors = append(additionalDecompressors,
+			l.resolver.additionalDecompressors(ctx, hosts, refspec, desc)...)
+	}
+	// Also add a direct external TOC decompressor for the fresh TOC
+	additionalDecompressors = append(additionalDecompressors,
+		esgzexternaltoc.NewRemoteDecompressor(ctx, hosts, refspec, desc))
+
+	meta, err := l.resolver.metadataStore(sr,
+		metadata.WithDecompressors(additionalDecompressors...),
+		metadata.WithStableIDs())
+	if err != nil {
+		newBlobObj.Close()
+		return fmt.Errorf("failed to create new metadata reader: %w", err)
+	}
+
+	// 4. Build new fs cache and reader
+	newFsCache, err := newCache(filepath.Join(l.resolver.rootDir, "fscache"), l.resolver.config.FSCacheType, l.resolver.config)
+	if err != nil {
+		newBlobObj.Close()
+		return fmt.Errorf("failed to create new fs cache: %w", err)
+	}
+
+	vr, err := reader.NewReader(meta, newFsCache, desc.Digest)
+	if err != nil {
+		newFsCache.Close()
+		newBlobObj.Close()
+		return fmt.Errorf("failed to create new reader: %w", err)
+	}
+
+	// 5. Skip verification for the new reader (verification of dynamic TOC is the caller's responsibility)
+	newReader := vr.SkipVerify()
+
+	// 6. Swap the blob reference
+	oldBlob := l.blob
+	l.blob = &blobRef{Blob: newBlobObj, done: func(bool) {}}
+
+	// 7. Swap reader atomically in the FUSE filesystem
+	if ffs, ok := l.fuseFs.(*fs); ok {
+		ffs.swapReader(newReader)
+	}
+
+	// 8. Update layer fields
+	oldVR := l.verifiableReader
+	l.verifiableReader = vr
+	l.r = newReader
+
+	// 9. Close old resources after a grace period for in-flight reads
+	go func() {
+		time.Sleep(5 * time.Second)
+		oldVR.Close()
+		oldBlob.done(true)
+	}()
+
+	log.G(ctx).Infof("successfully refreshed TOC for layer %v (new TOC digest: %v)", l.desc.Digest, meta.TOCDigest())
+	return nil
 }
 
 func (l *layer) Verify(tocDigest digest.Digest) (err error) {
@@ -625,7 +723,15 @@ func (l *layer) RootNode(baseInode uint32) (fusefs.InodeEmbedder, error) {
 	if l.r == nil {
 		return nil, fmt.Errorf("layer hasn't been verified yet")
 	}
-	return newNode(l.desc.Digest, l.r, l.blob, baseInode, l.resolver.overlayOpaqueType, l.passThrough, l.logFileAccess)
+	n, err := newNode(l.desc.Digest, l.r, l.blob, baseInode, l.resolver.overlayOpaqueType, l.passThrough, l.logFileAccess)
+	if err != nil {
+		return nil, err
+	}
+	// Wire up the FUSE filesystem reference for dynamic TOC swapping
+	if rootNode, ok := n.(*node); ok {
+		l.SetFUSEFs(rootNode.fs)
+	}
+	return n, nil
 }
 
 func (l *layer) ReadAt(p []byte, offset int64, opts ...remote.Option) (int, error) {

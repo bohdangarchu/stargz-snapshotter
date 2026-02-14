@@ -90,7 +90,6 @@ func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseIno
 		return nil, fmt.Errorf("unknown overlay opaque type")
 	}
 	ffs := &fs{
-		r:             r,
 		layerDigest:   layerDgst,
 		baseInode:     baseInode,
 		rootID:        rootID,
@@ -98,6 +97,7 @@ func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseIno
 		passThrough:   pth,
 		logFileAccess: logFileAccess,
 	}
+	ffs.rPtr.Store(&r)
 	ffs.s = ffs.newState(layerDgst, blob)
 	return &node{
 		id:   rootID,
@@ -108,7 +108,8 @@ func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseIno
 
 // fs contains global metadata used by nodes
 type fs struct {
-	r             reader.Reader
+	rPtr          atomic.Pointer[reader.Reader] // swappable reader for dynamic TOC replacement
+	generation    atomic.Uint64                 // bumped on each TOC swap; used to invalidate caches and stale handles
 	s             *state
 	layerDigest   digest.Digest
 	baseInode     uint32
@@ -116,6 +117,17 @@ type fs struct {
 	opaqueXattrs  []string
 	passThrough   passThroughConfig
 	logFileAccess bool
+}
+
+// r returns the current active reader (safe for concurrent use).
+func (fs *fs) r() reader.Reader {
+	return *fs.rPtr.Load()
+}
+
+// swapReader atomically replaces the active reader and bumps the generation counter.
+func (fs *fs) swapReader(newR reader.Reader) {
+	fs.rPtr.Store(&newR)
+	fs.generation.Add(1)
 }
 
 func (fs *fs) inodeOfState() uint64 {
@@ -156,9 +168,11 @@ type node struct {
 	id       uint32
 	accessed uint32
 	attr     metadata.Attr
+	attrGen  uint64 // generation when attr was fetched
 
 	ents       []fuse.DirEntry
 	entsCached bool
+	entsGen    uint64 // generation when ents were cached
 	entsMu     sync.Mutex
 }
 
@@ -167,7 +181,7 @@ func (n *node) isRootNode() bool {
 }
 
 func (n *node) isOpaque() bool {
-	if _, _, err := n.fs.r.Metadata().GetChild(n.id, whiteoutOpaqueDir); err == nil {
+	if _, _, err := n.fs.r().Metadata().GetChild(n.id, whiteoutOpaqueDir); err == nil {
 		return true
 	}
 	return false
@@ -191,6 +205,11 @@ func (n *node) readdir() ([]fuse.DirEntry, syscall.Errno) {
 	defer commonmetrics.MeasureLatencyInMicroseconds(commonmetrics.NodeReaddir, n.fs.layerDigest, start)
 
 	n.entsMu.Lock()
+	// Invalidate cached entries if the TOC generation has advanced
+	if gen := n.fs.generation.Load(); n.entsGen < gen {
+		n.entsCached = false
+		n.entsGen = gen
+	}
 	if n.entsCached {
 		ents := n.ents
 		n.entsMu.Unlock()
@@ -204,7 +223,7 @@ func (n *node) readdir() ([]fuse.DirEntry, syscall.Errno) {
 	whiteouts := map[string]uint32{}
 	normalEnts := map[string]bool{}
 	var lastErr error
-	if err := n.fs.r.Metadata().ForeachChild(n.id, func(name string, id uint32, mode os.FileMode) bool {
+	if err := n.fs.r().Metadata().ForeachChild(n.id, func(name string, id uint32, mode os.FileMode) bool {
 
 		// "." and ".." will be added later.
 		if name == "." || name == ".." {
@@ -338,10 +357,10 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 	}
 	n.entsMu.Unlock()
 
-	id, ce, err := n.fs.r.Metadata().GetChild(n.id, name)
+	id, ce, err := n.fs.r().Metadata().GetChild(n.id, name)
 	if err != nil {
 		// If the entry exists as a whiteout, show an overlayfs-styled whiteout node.
-		if whID, wh, err := n.fs.r.Metadata().GetChild(n.id, fmt.Sprintf("%s%s", whiteoutPrefix, name)); err == nil {
+		if whID, wh, err := n.fs.r().Metadata().GetChild(n.id, fmt.Sprintf("%s%s", whiteoutPrefix, name)); err == nil {
 			ino, err := n.fs.inodeOfID(whID)
 			if err != nil {
 				n.fs.s.report(fmt.Errorf("node.Lookup: %v", err))
@@ -372,7 +391,7 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 var _ = (fusefs.NodeOpener)((*node)(nil))
 
 func (n *node) Open(ctx context.Context, flags uint32) (fh fusefs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
-	ra, err := n.fs.r.OpenFile(n.id)
+	ra, err := n.fs.r().OpenFile(n.id)
 	if err != nil {
 		n.fs.s.report(fmt.Errorf("node.Open: %v", err))
 		return nil, 0, syscall.EIO
@@ -381,9 +400,10 @@ func (n *node) Open(ctx context.Context, flags uint32) (fh fusefs.FileHandle, fu
 	n.logAccessOnce(ctx)
 
 	f := &file{
-		n:  n,
-		ra: ra,
-		fd: -1,
+		n:              n,
+		ra:             ra,
+		fd:             -1,
+		openGeneration: n.fs.generation.Load(),
 	}
 
 	if n.fs.passThrough.enable {
@@ -405,6 +425,16 @@ func (n *node) Open(ctx context.Context, flags uint32) (fh fusefs.FileHandle, fu
 var _ = (fusefs.NodeGetattrer)((*node)(nil))
 
 func (n *node) Getattr(ctx context.Context, f fusefs.FileHandle, out *fuse.AttrOut) syscall.Errno {
+	// Re-fetch attributes from metadata if the TOC generation has advanced
+	if gen := n.fs.generation.Load(); n.attrGen < gen {
+		attr, err := n.fs.r().Metadata().GetAttr(n.id)
+		if err != nil {
+			n.fs.s.report(fmt.Errorf("node.Getattr: refresh attr: %v", err))
+			return syscall.EIO
+		}
+		n.attr = attr
+		n.attrGen = gen
+	}
 	ino, err := n.fs.inodeOfID(n.id)
 	if err != nil {
 		n.fs.s.report(fmt.Errorf("node.Getattr: %v", err))
@@ -475,15 +505,20 @@ func (n *node) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 
 // file is a file abstraction which implements file handle in go-fuse.
 type file struct {
-	n  *node
-	ra io.ReaderAt
-	fd int
-	cr cache.Reader
+	n              *node
+	ra             io.ReaderAt
+	fd             int
+	cr             cache.Reader
+	openGeneration uint64 // generation at which this file was opened; reads return EIO if stale
 }
 
 var _ = (fusefs.FileReader)((*file)(nil))
 
 func (f *file) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadResult, syscall.Errno) {
+	// If the TOC has been swapped since this file was opened, force re-open
+	if f.openGeneration < f.n.fs.generation.Load() {
+		return nil, syscall.EIO
+	}
 	defer commonmetrics.MeasureLatencyInMicroseconds(commonmetrics.ReadOnDemand, f.n.fs.layerDigest, time.Now()) // measure time for on-demand file reads (in microseconds)
 	defer commonmetrics.IncOperationCount(commonmetrics.OnDemandReadAccessCount, f.n.fs.layerDigest)             // increment the counter for on-demand file accesses
 	n, err := f.ra.ReadAt(dest, off)
