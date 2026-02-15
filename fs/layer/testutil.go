@@ -282,6 +282,8 @@ func testPrefetch(t *TestRunner, factory metadata.Store, lc layerConfig) {
 					ocispec.Descriptor{Digest: testStateLayerDigest},
 					&blobRef{blob, func(bool) {}},
 					vr,
+					nil,
+					reference.Spec{},
 					lc.passThroughConfig,
 					false,
 				)
@@ -822,7 +824,8 @@ func getRootNode(t TestingT, r metadata.Reader, opaque OverlayOpaqueType, tocDgs
 	if err != nil {
 		t.Fatalf("failed to verify reader: %v", err)
 	}
-	rootNode, err := newNode(testStateLayerDigest, rr, &testBlobState{10, 5}, 100, opaque, lc.passThroughConfig, false)
+	rRef := &readerRef{r: rr}
+	rootNode, err := newNode(testStateLayerDigest, rRef, &testBlobState{10, 5}, 100, opaque, lc.passThroughConfig, false)
 	if err != nil {
 		t.Fatalf("failed to get root node: %v", err)
 	}
@@ -872,7 +875,7 @@ func hasFileDigest(filename string, digest string) check {
 			t.Fatalf("failed to get node %q: %v", filename, err)
 		}
 		ni := n.Operations().(*node)
-		attr, err := ni.fs.r.Metadata().GetAttr(ni.id)
+		attr, err := ni.fs.rr.get().Metadata().GetAttr(ni.id)
 		if err != nil {
 			t.Fatalf("failed to get attr %q(%d): %v", filename, ni.id, err)
 		}

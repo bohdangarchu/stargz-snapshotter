@@ -79,7 +79,8 @@ var opaqueXattrs = map[OverlayOpaqueType][]string{
 	OverlayOpaqueUser:    {"user.overlay.opaque"},
 }
 
-func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseInode uint32, opaque OverlayOpaqueType, pth passThroughConfig, logFileAccess bool) (fusefs.InodeEmbedder, error) {
+func newNode(layerDgst digest.Digest, rr *readerRef, blob remote.Blob, baseInode uint32, opaque OverlayOpaqueType, pth passThroughConfig, logFileAccess bool) (fusefs.InodeEmbedder, error) {
+	r := rr.get()
 	rootID := r.Metadata().RootID()
 	rootAttr, err := r.Metadata().GetAttr(rootID)
 	if err != nil {
@@ -90,7 +91,7 @@ func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseIno
 		return nil, fmt.Errorf("unknown overlay opaque type")
 	}
 	ffs := &fs{
-		r:             r,
+		rr:            rr,
 		layerDigest:   layerDgst,
 		baseInode:     baseInode,
 		rootID:        rootID,
@@ -108,7 +109,7 @@ func newNode(layerDgst digest.Digest, r reader.Reader, blob remote.Blob, baseIno
 
 // fs contains global metadata used by nodes
 type fs struct {
-	r             reader.Reader
+	rr            *readerRef
 	s             *state
 	layerDigest   digest.Digest
 	baseInode     uint32
@@ -167,7 +168,7 @@ func (n *node) isRootNode() bool {
 }
 
 func (n *node) isOpaque() bool {
-	if _, _, err := n.fs.r.Metadata().GetChild(n.id, whiteoutOpaqueDir); err == nil {
+	if _, _, err := n.fs.rr.get().Metadata().GetChild(n.id, whiteoutOpaqueDir); err == nil {
 		return true
 	}
 	return false
@@ -204,7 +205,7 @@ func (n *node) readdir() ([]fuse.DirEntry, syscall.Errno) {
 	whiteouts := map[string]uint32{}
 	normalEnts := map[string]bool{}
 	var lastErr error
-	if err := n.fs.r.Metadata().ForeachChild(n.id, func(name string, id uint32, mode os.FileMode) bool {
+	if err := n.fs.rr.get().Metadata().ForeachChild(n.id, func(name string, id uint32, mode os.FileMode) bool {
 
 		// "." and ".." will be added later.
 		if name == "." || name == ".." {
@@ -338,10 +339,10 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 	}
 	n.entsMu.Unlock()
 
-	id, ce, err := n.fs.r.Metadata().GetChild(n.id, name)
+	id, ce, err := n.fs.rr.get().Metadata().GetChild(n.id, name)
 	if err != nil {
 		// If the entry exists as a whiteout, show an overlayfs-styled whiteout node.
-		if whID, wh, err := n.fs.r.Metadata().GetChild(n.id, fmt.Sprintf("%s%s", whiteoutPrefix, name)); err == nil {
+		if whID, wh, err := n.fs.rr.get().Metadata().GetChild(n.id, fmt.Sprintf("%s%s", whiteoutPrefix, name)); err == nil {
 			ino, err := n.fs.inodeOfID(whID)
 			if err != nil {
 				n.fs.s.report(fmt.Errorf("node.Lookup: %v", err))
@@ -372,7 +373,7 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 var _ = (fusefs.NodeOpener)((*node)(nil))
 
 func (n *node) Open(ctx context.Context, flags uint32) (fh fusefs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
-	ra, err := n.fs.r.OpenFile(n.id)
+	ra, err := n.fs.rr.get().OpenFile(n.id)
 	if err != nil {
 		n.fs.s.report(fmt.Errorf("node.Open: %v", err))
 		return nil, 0, syscall.EIO

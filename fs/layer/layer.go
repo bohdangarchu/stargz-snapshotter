@@ -85,6 +85,11 @@ type Layer interface {
 	// Refresh refreshes the layer connection.
 	Refresh(ctx context.Context, hosts source.RegistryHosts, refspec reference.Spec, desc ocispec.Descriptor) error
 
+	// RefreshBlob switches the layer to use a new blob with a different digest.
+	// It fetches the new blob's TOC to update file offsets and invalidates caches.
+	// Verification is skipped. The operation is atomic with respect to FUSE reads.
+	RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) error
+
 	// Verify verifies this layer using the passed TOC Digest.
 	// Nop if Verify() or SkipVerify() was already called.
 	Verify(tocDigest digest.Digest) (err error)
@@ -332,7 +337,7 @@ func (r *Resolver) Resolve(ctx context.Context, hosts source.RegistryHosts, refs
 	}
 
 	// Combine layer information together and cache it.
-	l := newLayer(r, desc, blobR, vr, passThroughConfig{
+	l := newLayer(r, desc, blobR, vr, hosts, refspec, passThroughConfig{
 		enable:           r.config.PassThrough,
 		mergeBufferSize:  r.config.MergeBufferSize,
 		mergeWorkerCount: r.config.MergeWorkerCount,
@@ -391,11 +396,37 @@ func (r *Resolver) resolveBlob(ctx context.Context, hosts source.RegistryHosts, 
 	return &blobRef{cachedB.(remote.Blob), done}, nil
 }
 
+// readerRef wraps a reader.Reader behind a RWMutex, enabling atomic reader
+// swaps while FUSE nodes continue to serve reads. Both the layer and FUSE fs
+// struct share the same readerRef so a swap is visible to all FUSE operations.
+type readerRef struct {
+	mu sync.RWMutex
+	r  reader.Reader
+}
+
+// get returns the current reader under a read lock.
+func (rr *readerRef) get() reader.Reader {
+	rr.mu.RLock()
+	defer rr.mu.RUnlock()
+	return rr.r
+}
+
+// swap atomically replaces the reader and returns the old one.
+func (rr *readerRef) swap(newR reader.Reader) reader.Reader {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	old := rr.r
+	rr.r = newR
+	return old
+}
+
 func newLayer(
 	resolver *Resolver,
 	desc ocispec.Descriptor,
 	blob *blobRef,
 	vr *reader.VerifiableReader,
+	hosts source.RegistryHosts,
+	refspec reference.Spec,
 	pth passThroughConfig,
 	logFileAccess bool,
 ) *layer {
@@ -404,6 +435,9 @@ func newLayer(
 		desc:             desc,
 		blob:             blob,
 		verifiableReader: vr,
+		hosts:            hosts,
+		refspec:          refspec,
+		rr:               &readerRef{},
 		prefetchWaiter:   newWaiter(),
 		passThrough:      pth,
 		logFileAccess:    logFileAccess,
@@ -415,6 +449,10 @@ type layer struct {
 	desc             ocispec.Descriptor
 	blob             *blobRef
 	verifiableReader *reader.VerifiableReader
+	hosts            source.RegistryHosts
+	refspec          reference.Spec
+	rr               *readerRef // shared with FUSE nodes for atomic swap
+	rootInode        *fusefs.Inode
 	prefetchWaiter   *waiter
 
 	prefetchSize   int64
@@ -467,6 +505,78 @@ func (l *layer) Refresh(ctx context.Context, hosts source.RegistryHosts, refspec
 	return l.blob.Refresh(ctx, hosts, refspec, desc)
 }
 
+func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) error {
+	if l.isClosed() {
+		return fmt.Errorf("layer is already closed")
+	}
+
+	// Resolve the new blob from the same registry.
+	newBlobR, err := l.resolver.resolveBlob(ctx, l.hosts, l.refspec, newDesc)
+	if err != nil {
+		return fmt.Errorf("failed to resolve new blob: %w", err)
+	}
+
+	// Create a SectionReader over the new blob (same pattern as Resolve).
+	sr := io.NewSectionReader(readerAtFunc(func(p []byte, offset int64) (n int, err error) {
+		l.resolver.backgroundTaskManager.DoPrioritizedTask()
+		defer l.resolver.backgroundTaskManager.DonePrioritizedTask()
+		return newBlobR.ReadAt(p, offset)
+	}), 0, newBlobR.Size())
+
+	// Read metadata (footer + TOC) from the new blob.
+	meta, err := l.resolver.metadataStore(sr)
+	if err != nil {
+		newBlobR.done(true)
+		return fmt.Errorf("failed to read metadata from new blob: %w", err)
+	}
+
+	// Create a new FS cache for decompressed file data.
+	fsCache, err := newCache(filepath.Join(l.resolver.rootDir, "fscache"), l.resolver.config.FSCacheType, l.resolver.config)
+	if err != nil {
+		newBlobR.done(true)
+		return fmt.Errorf("failed to create fs cache: %w", err)
+	}
+
+	// Create a new reader and skip verification.
+	vr, err := reader.NewReader(meta, fsCache, newDesc.Digest)
+	if err != nil {
+		newBlobR.done(true)
+		fsCache.Close()
+		return fmt.Errorf("failed to create reader: %w", err)
+	}
+	newReader := vr.SkipVerify()
+
+	oldDigest := l.desc.Digest
+
+	// Atomically swap the reader visible to FUSE nodes.
+	l.rr.swap(newReader)
+
+	// Update layer state.
+	l.blob = newBlobR
+	l.desc = newDesc
+	l.verifiableReader = vr
+	l.r = newReader
+
+	// Invalidate kernel page cache so subsequent reads go through FUSE
+	// and hit the new reader instead of serving stale cached pages.
+	if l.rootInode != nil {
+		invalidateInodeCache(l.rootInode)
+	}
+
+	log.G(ctx).Infof("refreshed layer blob from %s to %s", oldDigest, newDesc.Digest)
+	return nil
+}
+
+// invalidateInodeCache recursively walks the FUSE inode tree and
+// invalidates kernel page cache for each inode.
+func invalidateInodeCache(inode *fusefs.Inode) {
+	// Invalidate this inode's cached pages (off=0, sz=0 means all).
+	inode.NotifyContent(0, 0)
+	for _, child := range inode.Children() {
+		invalidateInodeCache(child)
+	}
+}
+
 func (l *layer) Verify(tocDigest digest.Digest) (err error) {
 	if l.isClosed() {
 		return fmt.Errorf("layer is already closed")
@@ -475,6 +585,9 @@ func (l *layer) Verify(tocDigest digest.Digest) (err error) {
 		return nil
 	}
 	l.r, err = l.verifiableReader.VerifyTOC(tocDigest)
+	if err == nil {
+		l.rr.swap(l.r)
+	}
 	return
 }
 
@@ -483,6 +596,7 @@ func (l *layer) SkipVerify() {
 		return
 	}
 	l.r = l.verifiableReader.SkipVerify()
+	l.rr.swap(l.r)
 }
 
 func (l *layer) Prefetch(prefetchSize int64) (err error) {
@@ -628,7 +742,12 @@ func (l *layer) RootNode(baseInode uint32) (fusefs.InodeEmbedder, error) {
 	if l.r == nil {
 		return nil, fmt.Errorf("layer hasn't been verified yet")
 	}
-	return newNode(l.desc.Digest, l.r, l.blob, baseInode, l.resolver.overlayOpaqueType, l.passThrough, l.logFileAccess)
+	n, err := newNode(l.desc.Digest, l.rr, l.blob, baseInode, l.resolver.overlayOpaqueType, l.passThrough, l.logFileAccess)
+	if err != nil {
+		return nil, err
+	}
+	l.rootInode = n.EmbeddedInode()
+	return n, nil
 }
 
 func (l *layer) ReadAt(p []byte, offset int64, opts ...remote.Option) (int, error) {

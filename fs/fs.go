@@ -445,6 +445,39 @@ func (fs *filesystem) check(ctx context.Context, l layer.Layer, labels map[strin
 	return rErr
 }
 
+func (fs *filesystem) RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest) error {
+	fs.backgroundTaskManager.DoPrioritizedTask()
+	defer fs.backgroundTaskManager.DonePrioritizedTask()
+
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("old_digest", oldDigest).WithField("new_digest", newDigest))
+
+	// Find the mounted layer by its current digest.
+	fs.layerMu.Lock()
+	var targetLayer layer.Layer
+	for mp, l := range fs.layer {
+		info := l.Info()
+		log.G(ctx).WithField("mountpoint", mp).WithField("layer_digest", info.Digest).Debug("checking mounted layer")
+		if info.Digest == oldDigest {
+			targetLayer = l
+			break
+		}
+	}
+	fs.layerMu.Unlock()
+
+	if targetLayer == nil {
+		return fmt.Errorf("layer with digest %s not found among mounted layers (have %d layers)", oldDigest, len(fs.layer))
+	}
+
+	newDesc := ocispec.Descriptor{Digest: newDigest}
+	if err := targetLayer.RefreshBlob(ctx, newDesc); err != nil {
+		log.G(ctx).WithError(err).Error("failed to refresh layer blob")
+		return fmt.Errorf("failed to refresh layer blob: %w", err)
+	}
+
+	log.G(ctx).Info("layer blob refreshed successfully")
+	return nil
+}
+
 func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
 	if mountpoint == "" {
 		return fmt.Errorf("mount point must be specified")

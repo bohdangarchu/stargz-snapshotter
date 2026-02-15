@@ -65,11 +65,12 @@ func WithFilesystemOptions(opts ...stargzfs.Option) Option {
 	}
 }
 
-// NewStargzSnapshotterService returns stargz snapshotter.
-func NewStargzSnapshotterService(ctx context.Context, root string, config *Config, opts ...Option) (snapshots.Snapshotter, error) {
+// NewStargzSnapshotterService returns stargz snapshotter and the underlying filesystem.
+// The filesystem reference can be used to register additional gRPC services (e.g. layer refresh).
+func NewStargzSnapshotterService(ctx context.Context, root string, config *Config, opts ...Option) (snapshots.Snapshotter, snapshot.FileSystem, error) {
 	fs, err := NewFileSystem(ctx, root, config, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure filesystem: %w", err)
+		return nil, nil, fmt.Errorf("failed to configure filesystem: %w", err)
 	}
 
 	var snapshotter snapshots.Snapshotter
@@ -81,10 +82,10 @@ func NewStargzSnapshotterService(ctx context.Context, root string, config *Confi
 
 	snapshotter, err = snapshot.NewSnapshotter(ctx, snapshotterRoot(root), fs, snOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new snapshotter: %w", err)
+		return nil, nil, fmt.Errorf("failed to create new snapshotter: %w", err)
 	}
 
-	return snapshotter, nil
+	return snapshotter, fs, nil
 }
 
 func NewFileSystem(ctx context.Context, root string, config *Config, opts ...Option) (snapshot.FileSystem, error) {

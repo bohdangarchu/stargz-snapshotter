@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 	"github.com/containerd/stargz-snapshotter/cmd/containerd-stargz-grpc/fsopts"
+	fspb "github.com/containerd/stargz-snapshotter/fs/pb"
 	"github.com/containerd/stargz-snapshotter/fusemanager"
 	"github.com/containerd/stargz-snapshotter/service"
 	"github.com/containerd/stargz-snapshotter/service/keychain/keychainconfig"
@@ -253,10 +254,17 @@ func main() {
 			log.G(ctx).WithError(err).Fatalf("failed to configure fs config")
 		}
 
-		rs, err = service.NewStargzSnapshotterService(ctx, *rootDir, &config.Config,
+		var sfs snbase.FileSystem
+		rs, sfs, err = service.NewStargzSnapshotterService(ctx, *rootDir, &config.Config,
 			service.WithCredsFuncs(credsFuncs...), service.WithFilesystemOptions(fsOpts...))
 		if err != nil {
 			log.G(ctx).WithError(err).Fatalf("failed to configure snapshotter")
+		}
+
+		// Register the layer refresh gRPC service if the filesystem supports it.
+		if refresher, ok := sfs.(fspb.LayerRefresher); ok {
+			fspb.RegisterStargzControlServer(rpc, fspb.NewControlServer(refresher))
+			log.G(ctx).Info("registered layer refresh gRPC service")
 		}
 	}
 
