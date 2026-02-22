@@ -19,6 +19,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	fspb "github.com/containerd/stargz-snapshotter/fs/pb"
 	digest "github.com/opencontainers/go-digest"
@@ -67,15 +68,17 @@ var RefreshLayerCommand = &cli.Command{
 		defer conn.Close()
 
 		client := fspb.NewStargzControlClient(conn)
+		start := time.Now()
 		_, err = client.RefreshLayer(clicontext.Context, &fspb.RefreshLayerRequest{
 			OldDigest: oldDigestStr,
 			NewDigest: newDigestStr,
 		})
+		elapsed := time.Since(start)
 		if err != nil {
 			return fmt.Errorf("failed to refresh layer: %w", err)
 		}
 
-		fmt.Printf("Successfully refreshed layer %s -> %s\n", oldDigestStr, newDigestStr)
+		fmt.Printf("Successfully refreshed layer %s -> %s in %s\n", oldDigestStr, newDigestStr, elapsed)
 		return nil
 	},
 }
