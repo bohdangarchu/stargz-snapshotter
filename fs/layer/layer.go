@@ -524,7 +524,12 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) err
 	}), 0, newBlobR.Size())
 
 	// Read metadata (footer + TOC) from the new blob.
-	meta, err := l.resolver.metadataStore(sr)
+	// Include zstdchunked decompressor so both gzip and zstd-chunked blobs are handled.
+	additionalDecompressors := []metadata.Decompressor{new(zstdchunked.Decompressor)}
+	if l.resolver.additionalDecompressors != nil {
+		additionalDecompressors = append(additionalDecompressors, l.resolver.additionalDecompressors(ctx, l.hosts, l.refspec, newDesc)...)
+	}
+	meta, err := l.resolver.metadataStore(sr, metadata.WithDecompressors(additionalDecompressors...))
 	if err != nil {
 		newBlobR.done(true)
 		return fmt.Errorf("failed to read metadata from new blob: %w", err)
