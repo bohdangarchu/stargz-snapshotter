@@ -35,6 +35,7 @@ func NewBackgroundTaskManager(concurrency int64, period time.Duration) *Backgrou
 		prioritizedTaskSilencePeriod: period,
 		prioritizedTaskStartNotify:   make(chan struct{}),
 		prioritizedTaskDoneCond:      sync.NewCond(&sync.Mutex{}),
+		mountDoneCond:                sync.NewCond(&sync.Mutex{}),
 	}
 }
 
@@ -66,6 +67,8 @@ type BackgroundTaskManager struct {
 	prioritizedTaskStartNotify   chan struct{}
 	prioritizedTaskStartNotifyMu sync.Mutex
 	prioritizedTaskDoneCond      *sync.Cond
+	mountTasks                   int64
+	mountDoneCond                *sync.Cond
 }
 
 // DoPrioritizedTask tells the manager that we are running a prioritized task
@@ -105,6 +108,34 @@ func (ts *BackgroundTaskManager) WaitForPrioritizedSilence() {
 			ts.prioritizedTaskDoneCond.Wait()
 		}
 		ts.prioritizedTaskDoneCond.L.Unlock()
+	}
+}
+
+// DoMountTask tells the manager that a Mount (TOC fetch) is in progress.
+func (ts *BackgroundTaskManager) DoMountTask() {
+	atomic.AddInt64(&ts.mountTasks, 1)
+}
+
+// DoneMountTask tells the manager that a Mount (TOC fetch) has completed.
+func (ts *BackgroundTaskManager) DoneMountTask() {
+	go func() {
+		time.Sleep(ts.prioritizedTaskSilencePeriod)
+		atomic.AddInt64(&ts.mountTasks, -1)
+		ts.mountDoneCond.L.Lock()
+		ts.mountDoneCond.Broadcast()
+		ts.mountDoneCond.L.Unlock()
+	}()
+}
+
+// WaitForMountSilence blocks until no Mount tasks have been running for the
+// silence period. Use this to defer prefetch until TOC fetches settle.
+func (ts *BackgroundTaskManager) WaitForMountSilence() {
+	for atomic.LoadInt64(&ts.mountTasks) > 0 {
+		ts.mountDoneCond.L.Lock()
+		if atomic.LoadInt64(&ts.mountTasks) > 0 {
+			ts.mountDoneCond.Wait()
+		}
+		ts.mountDoneCond.L.Unlock()
 	}
 }
 

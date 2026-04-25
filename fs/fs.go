@@ -223,6 +223,8 @@ func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 	// tasks.
 	fs.backgroundTaskManager.DoPrioritizedTask()
 	defer fs.backgroundTaskManager.DonePrioritizedTask()
+	fs.backgroundTaskManager.DoMountTask()
+	defer fs.backgroundTaskManager.DoneMountTask()
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("mountpoint", mountpoint))
 
 	// Get source information of this layer.
