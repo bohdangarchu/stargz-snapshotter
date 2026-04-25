@@ -607,8 +607,11 @@ func (l *layer) SkipVerify() {
 func (l *layer) Prefetch(prefetchSize int64) (err error) {
 	l.prefetchOnce.Do(func() {
 		ctx := context.Background()
-		l.resolver.backgroundTaskManager.DoPrioritizedTask()
-		defer l.resolver.backgroundTaskManager.DonePrioritizedTask()
+		// Wait for in-flight prioritized work (e.g. neighbor layers' TOC
+		// fetches via Resolve) to settle before consuming bandwidth with
+		// prefetch. Once we proceed, run to completion — prefetch is one-shot
+		// and not safely cancellable mid-fetch.
+		l.resolver.backgroundTaskManager.WaitForPrioritizedSilence()
 		err = l.prefetch(ctx, prefetchSize)
 		if err != nil {
 			log.G(ctx).WithError(err).Warnf("failed to prefetch layer=%v", l.desc.Digest)

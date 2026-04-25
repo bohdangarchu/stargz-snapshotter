@@ -93,6 +93,21 @@ func (ts *BackgroundTaskManager) DonePrioritizedTask() {
 	}()
 }
 
+// WaitForPrioritizedSilence blocks until no prioritized task has been running
+// for the silence period, then returns. Unlike InvokeBackgroundTask, the caller
+// proceeds without yielding to subsequent prioritized tasks — use this for
+// one-shot work that must not be cancelled mid-flight but should defer to
+// in-flight prioritized work before starting.
+func (ts *BackgroundTaskManager) WaitForPrioritizedSilence() {
+	for atomic.LoadInt64(&ts.prioritizedTasks) > 0 {
+		ts.prioritizedTaskDoneCond.L.Lock()
+		if atomic.LoadInt64(&ts.prioritizedTasks) > 0 {
+			ts.prioritizedTaskDoneCond.Wait()
+		}
+		ts.prioritizedTaskDoneCond.L.Unlock()
+	}
+}
+
 // InvokeBackgroundTask invokes a background task. The task is started only when
 // no prioritized tasks are running. Prioritized task's execution stops the
 // execution of all background tasks. Background task must be able to be
