@@ -27,6 +27,7 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type RefreshLayerRequest struct {
 	OldDigest            string   `protobuf:"bytes,1,opt,name=old_digest,json=oldDigest,proto3" json:"old_digest,omitempty"`
 	NewDigest            string   `protobuf:"bytes,2,opt,name=new_digest,json=newDigest,proto3" json:"new_digest,omitempty"`
+	WithBackgroundFetch  bool     `protobuf:"varint,3,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -65,6 +66,13 @@ func (m *RefreshLayerRequest) GetNewDigest() string {
 		return m.NewDigest
 	}
 	return ""
+}
+
+func (m *RefreshLayerRequest) GetWithBackgroundFetch() bool {
+	if m != nil {
+		return m.WithBackgroundFetch
+	}
+	return false
 }
 
 type RefreshLayerResponse struct {

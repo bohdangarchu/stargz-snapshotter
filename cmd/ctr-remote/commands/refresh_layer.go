@@ -41,6 +41,10 @@ var RefreshLayerCommand = &cli.Command{
 			Usage: "address of the stargz snapshotter gRPC socket",
 			Value: defaultSnapshotterAddress,
 		},
+		&cli.BoolFlag{
+			Name:  "with-background-fetch",
+			Usage: "after refresh, fetch the whole new layer in the background",
+		},
 	},
 	Action: func(clicontext *cli.Context) error {
 		oldDigestStr := clicontext.Args().Get(0)
@@ -70,8 +74,9 @@ var RefreshLayerCommand = &cli.Command{
 		client := fspb.NewStargzControlClient(conn)
 		start := time.Now()
 		_, err = client.RefreshLayer(clicontext.Context, &fspb.RefreshLayerRequest{
-			OldDigest: oldDigestStr,
-			NewDigest: newDigestStr,
+			OldDigest:           oldDigestStr,
+			NewDigest:           newDigestStr,
+			WithBackgroundFetch: clicontext.Bool("with-background-fetch"),
 		})
 		elapsed := time.Since(start)
 		if err != nil {

@@ -445,7 +445,7 @@ func (fs *filesystem) check(ctx context.Context, l layer.Layer, labels map[strin
 	return rErr
 }
 
-func (fs *filesystem) RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest) error {
+func (fs *filesystem) RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest, withBackgroundFetch bool) error {
 	fs.backgroundTaskManager.DoPrioritizedTask()
 	defer fs.backgroundTaskManager.DonePrioritizedTask()
 
@@ -475,6 +475,19 @@ func (fs *filesystem) RefreshLayer(ctx context.Context, oldDigest, newDigest dig
 	}
 
 	log.G(ctx).Info("layer blob refreshed successfully")
+
+	// Optionally fetch new layer in the background.
+	// Runs regardless of fs.noBackgroundFetch
+	if withBackgroundFetch {
+		go func() {
+			if err := targetLayer.BackgroundFetch(); err != nil {
+				log.G(ctx).WithError(err).Warn("background fetch after refresh-layer failed")
+				return
+			}
+			log.G(ctx).Info("background fetch after refresh-layer completed")
+		}()
+	}
+
 	return nil
 }
 

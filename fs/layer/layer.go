@@ -562,6 +562,10 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) err
 	l.verifiableReader = vr
 	l.r = newReader
 
+	// Reset so callers can re-trigger them against the new blob
+	l.prefetchOnce = sync.Once{}
+	l.backgroundFetchOnce = sync.Once{}
+
 	// Invalidate kernel page cache so subsequent reads go through FUSE
 	// and hit the new reader instead of serving stale cached pages.
 	if l.rootInode != nil {

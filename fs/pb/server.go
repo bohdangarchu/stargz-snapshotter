@@ -25,7 +25,7 @@ import (
 
 // LayerRefresher is the interface that the filesystem must implement for layer refresh.
 type LayerRefresher interface {
-	RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest) error
+	RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest, withBackgroundFetch bool) error
 }
 
 type controlServer struct {
@@ -47,7 +47,7 @@ func (s *controlServer) RefreshLayer(ctx context.Context, req *RefreshLayerReque
 	if err != nil {
 		return nil, fmt.Errorf("invalid new digest %q: %w", req.NewDigest, err)
 	}
-	if err := s.refresher.RefreshLayer(ctx, oldDigest, newDigest); err != nil {
+	if err := s.refresher.RefreshLayer(ctx, oldDigest, newDigest, req.WithBackgroundFetch); err != nil {
 		return nil, fmt.Errorf("failed to refresh layer: %w", err)
 	}
 	return &RefreshLayerResponse{}, nil
