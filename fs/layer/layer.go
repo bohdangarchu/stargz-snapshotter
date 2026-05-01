@@ -719,6 +719,7 @@ func (l *layer) backgroundFetch(ctx context.Context) error {
 		l.resolver.backgroundTaskManager.InvokeBackgroundTask(func(ctx context.Context) {
 			// Measuring the time to download background fetch data (in milliseconds)
 			defer commonmetrics.MeasureLatencyInMilliseconds(commonmetrics.BackgroundFetchDownload, l.Info().Digest, time.Now()) // time to download background fetch data
+			defer commonmetrics.WriteLatencyLogValue(ctx, l.Info().Digest, commonmetrics.BackgroundFetchDownload, time.Now())
 			retN, retErr = l.blob.ReadAt(
 				p,
 				offset,

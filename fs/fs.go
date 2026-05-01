@@ -405,8 +405,12 @@ func (fs *filesystem) Check(ctx context.Context, mountpoint string, labels map[s
 
 	// Wait for prefetch compeletion
 	if !fs.noprefetch {
+		log.G(ctx).Debug("waiting for prefetch completion")
+		prefetchWaitStart := time.Now()
 		if err := l.WaitForPrefetchCompletion(); err != nil {
 			log.G(ctx).WithError(err).Warn("failed to sync with prefetch completion")
+		} else {
+			log.G(ctx).WithField("elapsed", time.Since(prefetchWaitStart)).Debug("prefetch completion done")
 		}
 	}
 

@@ -389,7 +389,7 @@ func (n *node) Open(ctx context.Context, flags uint32) (fh fusefs.FileHandle, fu
 
 	if n.fs.passThrough.enable {
 		if getter, ok := ra.(reader.PassthroughFdGetter); ok {
-			fd, cr, err := getter.GetPassthroughFd(n.fs.passThrough.mergeBufferSize, n.fs.passThrough.mergeWorkerCount)
+			fd, cr, err := getter.GetPassthroughFd(ctx, n.fs.passThrough.mergeBufferSize, n.fs.passThrough.mergeWorkerCount)
 			if err != nil {
 				n.fs.s.report(fmt.Errorf("passThrough model failed due to node.Open: %v", err))
 				n.fs.passThrough.enable = false

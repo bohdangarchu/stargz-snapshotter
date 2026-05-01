@@ -71,6 +71,7 @@ const (
 	BackgroundFetchDownload   = "background_fetch_download"
 	BackgroundFetchDecompress = "background_fetch_decompress"
 	PrefetchSize              = "prefetch_size"
+	PassthroughOpen           = "passthrough_open"
 )
 
 var (
