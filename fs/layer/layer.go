@@ -93,7 +93,7 @@ type Layer interface {
 	// and new TOCs. DeltaResult.Fallback is true when the old and new TOCs
 	// cannot be aligned chunk-for-chunk, in which case the layer fell back to
 	// whole-blob invalidation.
-	RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*DeltaResult, error)
+	RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor, expectedTOC digest.Digest) (*DeltaResult, error)
 
 	// BackgroundFetchChunks fetches only the named chunks from the current blob
 	// into the cache.
@@ -514,7 +514,7 @@ func (l *layer) Refresh(ctx context.Context, hosts source.RegistryHosts, refspec
 	return l.blob.Refresh(ctx, hosts, refspec, desc)
 }
 
-func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*DeltaResult, error) {
+func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor, expectedTOC digest.Digest) (*DeltaResult, error) {
 	if l.isClosed() {
 		return nil, fmt.Errorf("layer is already closed")
 	}
@@ -558,14 +558,18 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*D
 		return nil, fmt.Errorf("failed to create fs cache: %w", err)
 	}
 
-	// Create a new reader and skip verification.
 	vr, err := reader.NewReader(meta, fsCache, newDesc.Digest)
 	if err != nil {
 		newBlobR.done(true)
 		fsCache.Close()
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
-	newReader := vr.SkipVerify()
+	newReader, verifyErr := refreshVerify(vr, expectedTOC, l.resolver.config.DisableVerification, l.resolver.config.AllowNoVerification)
+	if verifyErr != nil {
+		newBlobR.done(true)
+		fsCache.Close()
+		return nil, verifyErr
+	}
 
 	oldDigest := l.desc.Digest
 
@@ -599,6 +603,23 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*D
 		"fallback":       delta.Fallback,
 	}).Infof("refreshed layer blob from %s to %s", oldDigest, newDesc.Digest)
 	return delta, nil
+}
+
+func refreshVerify(vr *reader.VerifiableReader, expectedTOC digest.Digest, disableVerification, allowNoVerification bool) (reader.Reader, error) {
+	switch {
+	case disableVerification:
+		return vr.SkipVerify(), nil
+	case expectedTOC != "":
+		newReader, err := vr.VerifyTOC(expectedTOC)
+		if err != nil {
+			return nil, fmt.Errorf("verify new TOC %s: %w", expectedTOC, err)
+		}
+		return newReader, nil
+	case allowNoVerification:
+		return vr.SkipVerify(), nil
+	default:
+		return nil, fmt.Errorf("refresh refused: new TOC digest is required (set new_toc_digest, or enable allow_no_verification / disable_verification)")
+	}
 }
 
 // invalidateInodeCache recursively walks the FUSE inode tree and

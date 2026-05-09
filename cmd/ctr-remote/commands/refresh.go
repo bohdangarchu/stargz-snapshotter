@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	"github.com/containerd/stargz-snapshotter/estargz"
 	fspb "github.com/containerd/stargz-snapshotter/fs/pb"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
@@ -142,8 +143,9 @@ var RefreshCommand = &cli.Command{
 				continue
 			}
 			pairs = append(pairs, &fspb.LayerPair{
-				OldDigest: oldDigest.String(),
-				NewDigest: newDigest.String(),
+				OldDigest:    oldDigest.String(),
+				NewDigest:    newDigest.String(),
+				NewTocDigest: newManifest.Layers[i].Annotations[estargz.TOCJSONDigestAnnotation],
 			})
 		}
 		fmt.Printf("Refreshing %s -> %s: %d layer(s) to refresh, %d unchanged\n", oldRef, newRef, len(pairs), skipped)

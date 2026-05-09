@@ -35,8 +35,9 @@ type LayerRefresher interface {
 
 // ImageLayerPair is the daemon-side input form of a single layer refresh pair.
 type ImageLayerPair struct {
-	OldDigest digest.Digest
-	NewDigest digest.Digest
+	OldDigest    digest.Digest
+	NewDigest    digest.Digest
+	NewTOCDigest digest.Digest
 }
 
 type controlServer struct {
@@ -63,7 +64,18 @@ func (s *controlServer) RefreshImage(ctx context.Context, req *RefreshImageReque
 		if err != nil {
 			return nil, fmt.Errorf("pair %d invalid new digest %q: %w", i, p.NewDigest, err)
 		}
-		pairs = append(pairs, ImageLayerPair{OldDigest: oldDgst, NewDigest: newDgst})
+		var newTOCDgst digest.Digest
+		if p.NewTocDigest != "" {
+			newTOCDgst, err = digest.Parse(p.NewTocDigest)
+			if err != nil {
+				return nil, fmt.Errorf("pair %d invalid new toc digest %q: %w", i, p.NewTocDigest, err)
+			}
+		}
+		pairs = append(pairs, ImageLayerPair{
+			OldDigest:    oldDgst,
+			NewDigest:    newDgst,
+			NewTOCDigest: newTOCDgst,
+		})
 	}
 	results, err := s.refresher.RefreshImage(ctx, pairs, req.WithBackgroundFetch)
 	if err != nil {

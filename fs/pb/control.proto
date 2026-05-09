@@ -25,6 +25,7 @@ service StargzControl {
 message LayerPair {
   string old_digest = 1;
   string new_digest = 2;
+  string new_toc_digest = 3;
 }
 
 message RefreshImageRequest {

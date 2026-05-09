@@ -492,7 +492,7 @@ func (fs *filesystem) RefreshImage(ctx context.Context, pairs []pb.ImageLayerPai
 		}
 
 		newDesc := ocispec.Descriptor{Digest: p.NewDigest}
-		delta, err := targetLayer.RefreshBlob(pairCtx, newDesc)
+		delta, err := targetLayer.RefreshBlob(pairCtx, newDesc, p.NewTOCDigest)
 		if err != nil {
 			res.Error = fmt.Sprintf("failed to refresh layer blob: %v", err)
 			log.G(pairCtx).WithError(err).Warn("failed to refresh layer blob")
