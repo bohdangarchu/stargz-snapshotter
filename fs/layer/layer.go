@@ -88,7 +88,16 @@ type Layer interface {
 	// RefreshBlob switches the layer to use a new blob with a different digest.
 	// It fetches the new blob's TOC to update file offsets and invalidates caches.
 	// Verification is skipped. The operation is atomic with respect to FUSE reads.
-	RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) error
+	//
+	// The returned DeltaResult describes the chunks that differ between the old
+	// and new TOCs. DeltaResult.Fallback is true when the old and new TOCs
+	// cannot be aligned chunk-for-chunk, in which case the layer fell back to
+	// whole-blob invalidation.
+	RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*DeltaResult, error)
+
+	// BackgroundFetchChunks fetches only the named chunks from the current blob
+	// into the cache.
+	BackgroundFetchChunks(ctx context.Context, chunks []ChunkRef) error
 
 	// Verify verifies this layer using the passed TOC Digest.
 	// Nop if Verify() or SkipVerify() was already called.
@@ -505,18 +514,18 @@ func (l *layer) Refresh(ctx context.Context, hosts source.RegistryHosts, refspec
 	return l.blob.Refresh(ctx, hosts, refspec, desc)
 }
 
-func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) error {
+func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) (*DeltaResult, error) {
 	if l.isClosed() {
-		return fmt.Errorf("layer is already closed")
+		return nil, fmt.Errorf("layer is already closed")
 	}
 
 	// Resolve the new blob from the same registry.
 	newBlobR, err := l.resolver.resolveBlob(ctx, l.hosts, l.refspec, newDesc)
 	if err != nil {
-		return fmt.Errorf("failed to resolve new blob: %w", err)
+		return nil, fmt.Errorf("failed to resolve new blob: %w", err)
 	}
 
-	// Create a SectionReader over the new blob (same pattern as Resolve).
+	// Create a SectionReader over the new blob.
 	sr := io.NewSectionReader(readerAtFunc(func(p []byte, offset int64) (n int, err error) {
 		l.resolver.backgroundTaskManager.DoPrioritizedTask()
 		defer l.resolver.backgroundTaskManager.DonePrioritizedTask()
@@ -532,14 +541,21 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) err
 	meta, err := l.resolver.metadataStore(sr, metadata.WithDecompressors(additionalDecompressors...))
 	if err != nil {
 		newBlobR.done(true)
-		return fmt.Errorf("failed to read metadata from new blob: %w", err)
+		return nil, fmt.Errorf("failed to read metadata from new blob: %w", err)
+	}
+
+	// Diff the old and new TOCs while the old reader is still active.
+	delta, diffErr := diffTOCs(l.verifiableReader.Metadata(), meta)
+	if diffErr != nil {
+		log.G(ctx).WithError(diffErr).Warn("delta refresh diff failed; falling back to whole-layer invalidation")
+		delta = &DeltaResult{Fallback: true, FallbackReason: "diff error: " + diffErr.Error()}
 	}
 
 	// Create a new FS cache for decompressed file data.
 	fsCache, err := newCache(filepath.Join(l.resolver.rootDir, "fscache"), l.resolver.config.FSCacheType, l.resolver.config)
 	if err != nil {
 		newBlobR.done(true)
-		return fmt.Errorf("failed to create fs cache: %w", err)
+		return nil, fmt.Errorf("failed to create fs cache: %w", err)
 	}
 
 	// Create a new reader and skip verification.
@@ -547,7 +563,7 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) err
 	if err != nil {
 		newBlobR.done(true)
 		fsCache.Close()
-		return fmt.Errorf("failed to create reader: %w", err)
+		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
 	newReader := vr.SkipVerify()
 
@@ -569,11 +585,20 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor) err
 	// Invalidate kernel page cache so subsequent reads go through FUSE
 	// and hit the new reader instead of serving stale cached pages.
 	if l.rootInode != nil {
-		invalidateInodeCache(l.rootInode)
+		if delta.Fallback {
+			log.G(ctx).WithField("reason", delta.FallbackReason).Info("delta refresh fell back to whole-layer invalidation")
+			invalidateInodeCache(l.rootInode)
+		} else {
+			invalidateChangedChunks(l.rootInode, delta.ChangedChunks)
+		}
 	}
 
-	log.G(ctx).Infof("refreshed layer blob from %s to %s", oldDigest, newDesc.Digest)
-	return nil
+	log.G(ctx).WithFields(log.Fields{
+		"changed_chunks": len(delta.ChangedChunks),
+		"added_chunks":   len(delta.AddedChunks),
+		"fallback":       delta.Fallback,
+	}).Infof("refreshed layer blob from %s to %s", oldDigest, newDesc.Digest)
+	return delta, nil
 }
 
 // invalidateInodeCache recursively walks the FUSE inode tree and
@@ -715,10 +740,21 @@ func (l *layer) backgroundFetch(ctx context.Context) error {
 	if l.isClosed() {
 		return fmt.Errorf("layer is already closed")
 	}
-	br := io.NewSectionReader(readerAtFunc(func(p []byte, offset int64) (retN int, retErr error) {
+	br := l.newBackgroundSectionReader()
+	defer commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.BackgroundFetchDecompress, time.Now()) // time to decompress background fetch data (in milliseconds)
+	return l.verifiableReader.Cache(
+		reader.WithReader(br),                // Read contents in background
+		reader.WithCacheOpts(cache.Direct()), // Do not pollute mem cache
+	)
+}
+
+// newBackgroundSectionReader builds a SectionReader over the layer's blob whose
+// reads are routed through the background task manager.
+func (l *layer) newBackgroundSectionReader() *io.SectionReader {
+	return io.NewSectionReader(readerAtFunc(func(p []byte, offset int64) (retN int, retErr error) {
 		l.resolver.backgroundTaskManager.InvokeBackgroundTask(func(ctx context.Context) {
 			// Measuring the time to download background fetch data (in milliseconds)
-			defer commonmetrics.MeasureLatencyInMilliseconds(commonmetrics.BackgroundFetchDownload, l.Info().Digest, time.Now()) // time to download background fetch data
+			defer commonmetrics.MeasureLatencyInMilliseconds(commonmetrics.BackgroundFetchDownload, l.Info().Digest, time.Now())
 			defer commonmetrics.WriteLatencyLogValue(ctx, l.Info().Digest, commonmetrics.BackgroundFetchDownload, time.Now())
 			retN, retErr = l.blob.ReadAt(
 				p,
@@ -729,10 +765,33 @@ func (l *layer) backgroundFetch(ctx context.Context) error {
 		}, 120*time.Second)
 		return
 	}), 0, l.blob.Size())
-	defer commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.BackgroundFetchDecompress, time.Now()) // time to decompress background fetch data (in milliseconds)
+}
+
+func (l *layer) BackgroundFetchChunks(ctx context.Context, chunks []ChunkRef) error {
+	if l.isClosed() {
+		return fmt.Errorf("layer is already closed")
+	}
+	if len(chunks) == 0 {
+		return nil
+	}
+	type chunkKey struct {
+		id  uint32
+		off int64
+	}
+	wantedChunks := make(map[chunkKey]struct{}, len(chunks))
+	for _, c := range chunks {
+		wantedChunks[chunkKey{id: c.FileID, off: c.Offset}] = struct{}{}
+	}
+	defer commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.BackgroundFetchTotal, time.Now())
+	br := l.newBackgroundSectionReader()
+	defer commonmetrics.WriteLatencyLogValue(ctx, l.desc.Digest, commonmetrics.BackgroundFetchDecompress, time.Now())
 	return l.verifiableReader.Cache(
-		reader.WithReader(br),                // Read contents in background
-		reader.WithCacheOpts(cache.Direct()), // Do not pollute mem cache
+		reader.WithReader(br),
+		reader.WithCacheOpts(cache.Direct()),
+		reader.WithChunkFilter(func(id uint32, chunkOffset int64) bool {
+			_, ok := wantedChunks[chunkKey{id: id, off: chunkOffset}]
+			return ok
+		}),
 	)
 }
 

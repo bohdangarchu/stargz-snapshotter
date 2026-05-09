@@ -141,17 +141,18 @@ func (vr *VerifiableReader) Cache(opts ...CacheOption) (err error) {
 	if cacheOpts.filter != nil {
 		filter = cacheOpts.filter
 	}
+	chunkFilter := cacheOpts.chunkFilter
 
 	eg, egCtx := errgroup.WithContext(context.Background())
 	eg.Go(func() error {
 		return vr.cacheWithReader(egCtx,
 			0, eg, semaphore.NewWeighted(int64(runtime.GOMAXPROCS(0))),
-			rootID, r, filter, cacheOpts.cacheOpts...)
+			rootID, r, filter, chunkFilter, cacheOpts.cacheOpts...)
 	})
 	return eg.Wait()
 }
 
-func (vr *VerifiableReader) cacheWithReader(ctx context.Context, currentDepth int, eg *errgroup.Group, sem *semaphore.Weighted, dirID uint32, r metadata.Reader, filter func(int64) bool, opts ...cache.Option) (rErr error) {
+func (vr *VerifiableReader) cacheWithReader(ctx context.Context, currentDepth int, eg *errgroup.Group, sem *semaphore.Weighted, dirID uint32, r metadata.Reader, filter func(int64) bool, chunkFilter func(uint32, int64) bool, opts ...cache.Option) (rErr error) {
 	if currentDepth > maxWalkDepth {
 		return fmt.Errorf("tree is too deep (depth:%d)", currentDepth)
 	}
@@ -171,7 +172,7 @@ func (vr *VerifiableReader) cacheWithReader(ctx context.Context, currentDepth in
 				return true
 			}
 
-			if err := vr.cacheWithReader(ctx, currentDepth+1, eg, sem, id, r, filter, opts...); err != nil {
+			if err := vr.cacheWithReader(ctx, currentDepth+1, eg, sem, id, r, filter, chunkFilter, opts...); err != nil {
 				rErr = err
 				return false
 			}
@@ -209,6 +210,10 @@ func (vr *VerifiableReader) cacheWithReader(ctx context.Context, currentDepth in
 				break
 			}
 			nr += chunkSize
+
+			if chunkFilter != nil && !chunkFilter(id, chunkOffset) {
+				continue
+			}
 
 			if err := sem.Acquire(ctx, 1); err != nil {
 				rErr = err
@@ -873,9 +878,10 @@ func positive(n int64) int64 {
 type CacheOption func(*cacheOptions)
 
 type cacheOptions struct {
-	cacheOpts []cache.Option
-	filter    func(int64) bool
-	reader    *io.SectionReader
+	cacheOpts   []cache.Option
+	filter      func(int64) bool
+	chunkFilter func(id uint32, chunkOffset int64) bool
+	reader      *io.SectionReader
 }
 
 func WithCacheOpts(cacheOpts ...cache.Option) CacheOption {
@@ -887,6 +893,16 @@ func WithCacheOpts(cacheOpts ...cache.Option) CacheOption {
 func WithFilter(filter func(int64) bool) CacheOption {
 	return func(opts *cacheOptions) {
 		opts.filter = filter
+	}
+}
+
+// WithChunkFilter scopes Cache to the chunks for which the filter returns true.
+// The filter receives the metadata file id and the logical chunk offset within
+// that file. It is evaluated per-chunk after the file-level WithFilter, so the
+// two can be combined.
+func WithChunkFilter(filter func(id uint32, chunkOffset int64) bool) CacheOption {
+	return func(opts *cacheOptions) {
+		opts.chunkFilter = filter
 	}
 }
 

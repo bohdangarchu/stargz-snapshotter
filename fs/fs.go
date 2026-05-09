@@ -51,6 +51,7 @@ import (
 	"github.com/containerd/stargz-snapshotter/fs/layer"
 	commonmetrics "github.com/containerd/stargz-snapshotter/fs/metrics/common"
 	layermetrics "github.com/containerd/stargz-snapshotter/fs/metrics/layer"
+	pb "github.com/containerd/stargz-snapshotter/fs/pb"
 	"github.com/containerd/stargz-snapshotter/fs/remote"
 	"github.com/containerd/stargz-snapshotter/fs/source"
 	"github.com/containerd/stargz-snapshotter/metadata"
@@ -449,50 +450,96 @@ func (fs *filesystem) check(ctx context.Context, l layer.Layer, labels map[strin
 	return rErr
 }
 
-func (fs *filesystem) RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest, withBackgroundFetch bool) error {
+func (fs *filesystem) findLayerByDigest(d digest.Digest) layer.Layer {
+	fs.layerMu.Lock()
+	defer fs.layerMu.Unlock()
+	for _, l := range fs.layer {
+		if l.Info().Digest == d {
+			return l
+		}
+	}
+	return nil
+}
+
+// RefreshImage refreshes a batch of layers identified by (old, new) digest pairs.
+// Pairs whose old and new digests are equal are skipped. Per-pair failures are recorded in
+// the corresponding LayerResult and do not abort the rest of the batch.
+func (fs *filesystem) RefreshImage(ctx context.Context, pairs []pb.ImageLayerPair, withBackgroundFetch bool) ([]*pb.LayerResult, error) {
 	fs.backgroundTaskManager.DoPrioritizedTask()
 	defer fs.backgroundTaskManager.DonePrioritizedTask()
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("old_digest", oldDigest).WithField("new_digest", newDigest))
-
-	// Find the mounted layer by its current digest.
-	fs.layerMu.Lock()
-	var targetLayer layer.Layer
-	for mp, l := range fs.layer {
-		info := l.Info()
-		log.G(ctx).WithField("mountpoint", mp).WithField("layer_digest", info.Digest).Debug("checking mounted layer")
-		if info.Digest == oldDigest {
-			targetLayer = l
-			break
+	results := make([]*pb.LayerResult, 0, len(pairs))
+	for _, p := range pairs {
+		res := &pb.LayerResult{
+			OldDigest: p.OldDigest.String(),
+			NewDigest: p.NewDigest.String(),
 		}
+		if p.OldDigest == p.NewDigest {
+			results = append(results, res)
+			continue
+		}
+
+		pairCtx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+			"old_digest": p.OldDigest,
+			"new_digest": p.NewDigest,
+		}))
+		targetLayer := fs.findLayerByDigest(p.OldDigest)
+		if targetLayer == nil {
+			res.Error = fmt.Sprintf("layer with digest %s not found among mounted layers", p.OldDigest)
+			log.G(pairCtx).Warn(res.Error)
+			results = append(results, res)
+			continue
+		}
+
+		newDesc := ocispec.Descriptor{Digest: p.NewDigest}
+		delta, err := targetLayer.RefreshBlob(pairCtx, newDesc)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to refresh layer blob: %v", err)
+			log.G(pairCtx).WithError(err).Warn("failed to refresh layer blob")
+			results = append(results, res)
+			continue
+		}
+		if delta != nil {
+			res.Fallback = delta.Fallback
+			res.ChangedChunks = int64(len(delta.ChangedChunks))
+			res.AddedChunks = int64(len(delta.AddedChunks))
+		}
+		log.G(pairCtx).Info("layer blob refreshed successfully")
+
+		if withBackgroundFetch {
+			go runBackgroundFetchAfterRefresh(pairCtx, targetLayer, delta)
+		}
+		results = append(results, res)
 	}
-	fs.layerMu.Unlock()
+	return results, nil
+}
 
-	if targetLayer == nil {
-		return fmt.Errorf("layer with digest %s not found among mounted layers (have %d layers)", oldDigest, len(fs.layer))
+// runBackgroundFetchAfterRefresh fetches new chunks in the background, scoped to
+// the delta when available and falling back to a full layer fetch otherwise.
+func runBackgroundFetchAfterRefresh(ctx context.Context, l layer.Layer, delta *layer.DeltaResult) {
+	if delta == nil || delta.Fallback {
+		if err := l.BackgroundFetch(); err != nil {
+			log.G(ctx).WithError(err).Warn("background fetch after refresh failed")
+			return
+		}
+		log.G(ctx).Info("background fetch after refresh completed (whole layer)")
+		return
 	}
-
-	newDesc := ocispec.Descriptor{Digest: newDigest}
-	if err := targetLayer.RefreshBlob(ctx, newDesc); err != nil {
-		log.G(ctx).WithError(err).Error("failed to refresh layer blob")
-		return fmt.Errorf("failed to refresh layer blob: %w", err)
+	chunks := make([]layer.ChunkRef, 0, len(delta.ChangedChunks)+len(delta.AddedChunks))
+	chunks = append(chunks, delta.ChangedChunks...)
+	chunks = append(chunks, delta.AddedChunks...)
+	if len(chunks) == 0 {
+		log.G(ctx).Info("background fetch after refresh skipped: no chunks changed")
+		return
 	}
-
-	log.G(ctx).Info("layer blob refreshed successfully")
-
-	// Optionally fetch new layer in the background.
-	// Runs regardless of fs.noBackgroundFetch
-	if withBackgroundFetch {
-		go func() {
-			if err := targetLayer.BackgroundFetch(); err != nil {
-				log.G(ctx).WithError(err).Warn("background fetch after refresh-layer failed")
-				return
-			}
-			log.G(ctx).Info("background fetch after refresh-layer completed")
-		}()
+	if err := l.BackgroundFetchChunks(ctx, chunks); err != nil {
+		log.G(ctx).WithError(err).Warn("scoped background fetch after refresh failed")
+		return
 	}
-
-	return nil
+	log.G(ctx).WithFields(log.Fields{
+		"changed_chunks": len(delta.ChangedChunks),
+		"added_chunks":   len(delta.AddedChunks),
+	}).Info("background fetch after refresh completed (scoped)")
 }
 
 func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {

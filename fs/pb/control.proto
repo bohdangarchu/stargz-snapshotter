@@ -19,13 +19,34 @@ syntax = "proto3";
 option go_package = "github.com/stargz-snapshotter/fs/pb";
 
 service StargzControl {
-  rpc RefreshLayer(RefreshLayerRequest) returns (RefreshLayerResponse);
+  rpc RefreshImage(RefreshImageRequest) returns (RefreshImageResponse);
 }
 
-message RefreshLayerRequest {
+message LayerPair {
   string old_digest = 1;
   string new_digest = 2;
-  bool with_background_fetch = 3;
 }
 
-message RefreshLayerResponse {}
+message RefreshImageRequest {
+  repeated LayerPair pairs = 1;
+  bool with_background_fetch = 2;
+}
+
+message LayerResult {
+  string old_digest = 1;
+  string new_digest = 2;
+  // Empty on success; populated with the failure reason otherwise.
+  string error = 3;
+  // True when the per-layer refresh fell back to whole-layer invalidation
+  // instead of applying chunk-level deltas. Triggered when the old and new
+  // TOCs cannot be aligned chunk-for-chunk: entry count differs, a metadata
+  // id is present on only one side, walk order shifted (same id maps to a
+  // different (parent, name)), or any chunk lacks a ChunkDigest.
+  bool fallback = 4;
+  int64 changed_chunks = 5;
+  int64 added_chunks = 6;
+}
+
+message RefreshImageResponse {
+  repeated LayerResult results = 1;
+}

@@ -24,87 +24,253 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type RefreshLayerRequest struct {
+type LayerPair struct {
 	OldDigest            string   `protobuf:"bytes,1,opt,name=old_digest,json=oldDigest,proto3" json:"old_digest,omitempty"`
 	NewDigest            string   `protobuf:"bytes,2,opt,name=new_digest,json=newDigest,proto3" json:"new_digest,omitempty"`
-	WithBackgroundFetch  bool     `protobuf:"varint,3,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RefreshLayerRequest) Reset()         { *m = RefreshLayerRequest{} }
-func (m *RefreshLayerRequest) String() string { return proto.CompactTextString(m) }
-func (*RefreshLayerRequest) ProtoMessage()    {}
-func (m *RefreshLayerRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RefreshLayerRequest.Unmarshal(m, b)
+func (m *LayerPair) Reset()         { *m = LayerPair{} }
+func (m *LayerPair) String() string { return proto.CompactTextString(m) }
+func (*LayerPair) ProtoMessage()    {}
+func (*LayerPair) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{0}
 }
-func (m *RefreshLayerRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RefreshLayerRequest.Marshal(b, m, deterministic)
+func (m *LayerPair) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LayerPair.Unmarshal(m, b)
 }
-func (m *RefreshLayerRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RefreshLayerRequest.Merge(m, src)
+func (m *LayerPair) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LayerPair.Marshal(b, m, deterministic)
 }
-func (m *RefreshLayerRequest) XXX_Size() int {
-	return xxx_messageInfo_RefreshLayerRequest.Size(m)
+func (m *LayerPair) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LayerPair.Merge(m, src)
 }
-func (m *RefreshLayerRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_RefreshLayerRequest.DiscardUnknown(m)
+func (m *LayerPair) XXX_Size() int {
+	return xxx_messageInfo_LayerPair.Size(m)
+}
+func (m *LayerPair) XXX_DiscardUnknown() {
+	xxx_messageInfo_LayerPair.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_RefreshLayerRequest proto.InternalMessageInfo
+var xxx_messageInfo_LayerPair proto.InternalMessageInfo
 
-func (m *RefreshLayerRequest) GetOldDigest() string {
+func (m *LayerPair) GetOldDigest() string {
 	if m != nil {
 		return m.OldDigest
 	}
 	return ""
 }
 
-func (m *RefreshLayerRequest) GetNewDigest() string {
+func (m *LayerPair) GetNewDigest() string {
 	if m != nil {
 		return m.NewDigest
 	}
 	return ""
 }
 
-func (m *RefreshLayerRequest) GetWithBackgroundFetch() bool {
+type RefreshImageRequest struct {
+	Pairs                []*LayerPair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
+	WithBackgroundFetch  bool         `protobuf:"varint,2,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *RefreshImageRequest) Reset()         { *m = RefreshImageRequest{} }
+func (m *RefreshImageRequest) String() string { return proto.CompactTextString(m) }
+func (*RefreshImageRequest) ProtoMessage()    {}
+func (*RefreshImageRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{1}
+}
+func (m *RefreshImageRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RefreshImageRequest.Unmarshal(m, b)
+}
+func (m *RefreshImageRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RefreshImageRequest.Marshal(b, m, deterministic)
+}
+func (m *RefreshImageRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefreshImageRequest.Merge(m, src)
+}
+func (m *RefreshImageRequest) XXX_Size() int {
+	return xxx_messageInfo_RefreshImageRequest.Size(m)
+}
+func (m *RefreshImageRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_RefreshImageRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RefreshImageRequest proto.InternalMessageInfo
+
+func (m *RefreshImageRequest) GetPairs() []*LayerPair {
+	if m != nil {
+		return m.Pairs
+	}
+	return nil
+}
+
+func (m *RefreshImageRequest) GetWithBackgroundFetch() bool {
 	if m != nil {
 		return m.WithBackgroundFetch
 	}
 	return false
 }
 
-type RefreshLayerResponse struct {
+type LayerResult struct {
+	OldDigest string `protobuf:"bytes,1,opt,name=old_digest,json=oldDigest,proto3" json:"old_digest,omitempty"`
+	NewDigest string `protobuf:"bytes,2,opt,name=new_digest,json=newDigest,proto3" json:"new_digest,omitempty"`
+	// Empty on success; populated with the failure reason otherwise.
+	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	// True when the per-layer refresh fell back to whole-layer invalidation
+	// instead of applying chunk-level deltas. Triggered when the old and new
+	// TOCs cannot be aligned chunk-for-chunk: entry count differs, a metadata
+	// id is present on only one side, walk order shifted (same id maps to a
+	// different (parent, name)), or any chunk lacks a ChunkDigest.
+	Fallback             bool     `protobuf:"varint,4,opt,name=fallback,proto3" json:"fallback,omitempty"`
+	ChangedChunks        int64    `protobuf:"varint,5,opt,name=changed_chunks,json=changedChunks,proto3" json:"changed_chunks,omitempty"`
+	AddedChunks          int64    `protobuf:"varint,6,opt,name=added_chunks,json=addedChunks,proto3" json:"added_chunks,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RefreshLayerResponse) Reset()         { *m = RefreshLayerResponse{} }
-func (m *RefreshLayerResponse) String() string { return proto.CompactTextString(m) }
-func (*RefreshLayerResponse) ProtoMessage()    {}
-func (m *RefreshLayerResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RefreshLayerResponse.Unmarshal(m, b)
+func (m *LayerResult) Reset()         { *m = LayerResult{} }
+func (m *LayerResult) String() string { return proto.CompactTextString(m) }
+func (*LayerResult) ProtoMessage()    {}
+func (*LayerResult) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{2}
 }
-func (m *RefreshLayerResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RefreshLayerResponse.Marshal(b, m, deterministic)
+func (m *LayerResult) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LayerResult.Unmarshal(m, b)
 }
-func (m *RefreshLayerResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RefreshLayerResponse.Merge(m, src)
+func (m *LayerResult) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LayerResult.Marshal(b, m, deterministic)
 }
-func (m *RefreshLayerResponse) XXX_Size() int {
-	return xxx_messageInfo_RefreshLayerResponse.Size(m)
+func (m *LayerResult) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LayerResult.Merge(m, src)
 }
-func (m *RefreshLayerResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_RefreshLayerResponse.DiscardUnknown(m)
+func (m *LayerResult) XXX_Size() int {
+	return xxx_messageInfo_LayerResult.Size(m)
+}
+func (m *LayerResult) XXX_DiscardUnknown() {
+	xxx_messageInfo_LayerResult.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_RefreshLayerResponse proto.InternalMessageInfo
+var xxx_messageInfo_LayerResult proto.InternalMessageInfo
+
+func (m *LayerResult) GetOldDigest() string {
+	if m != nil {
+		return m.OldDigest
+	}
+	return ""
+}
+
+func (m *LayerResult) GetNewDigest() string {
+	if m != nil {
+		return m.NewDigest
+	}
+	return ""
+}
+
+func (m *LayerResult) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+func (m *LayerResult) GetFallback() bool {
+	if m != nil {
+		return m.Fallback
+	}
+	return false
+}
+
+func (m *LayerResult) GetChangedChunks() int64 {
+	if m != nil {
+		return m.ChangedChunks
+	}
+	return 0
+}
+
+func (m *LayerResult) GetAddedChunks() int64 {
+	if m != nil {
+		return m.AddedChunks
+	}
+	return 0
+}
+
+type RefreshImageResponse struct {
+	Results              []*LayerResult `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
+}
+
+func (m *RefreshImageResponse) Reset()         { *m = RefreshImageResponse{} }
+func (m *RefreshImageResponse) String() string { return proto.CompactTextString(m) }
+func (*RefreshImageResponse) ProtoMessage()    {}
+func (*RefreshImageResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{3}
+}
+func (m *RefreshImageResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RefreshImageResponse.Unmarshal(m, b)
+}
+func (m *RefreshImageResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RefreshImageResponse.Marshal(b, m, deterministic)
+}
+func (m *RefreshImageResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefreshImageResponse.Merge(m, src)
+}
+func (m *RefreshImageResponse) XXX_Size() int {
+	return xxx_messageInfo_RefreshImageResponse.Size(m)
+}
+func (m *RefreshImageResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_RefreshImageResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RefreshImageResponse proto.InternalMessageInfo
+
+func (m *RefreshImageResponse) GetResults() []*LayerResult {
+	if m != nil {
+		return m.Results
+	}
+	return nil
+}
 
 func init() {
-	proto.RegisterType((*RefreshLayerRequest)(nil), "RefreshLayerRequest")
-	proto.RegisterType((*RefreshLayerResponse)(nil), "RefreshLayerResponse")
+	proto.RegisterType((*LayerPair)(nil), "LayerPair")
+	proto.RegisterType((*RefreshImageRequest)(nil), "RefreshImageRequest")
+	proto.RegisterType((*LayerResult)(nil), "LayerResult")
+	proto.RegisterType((*RefreshImageResponse)(nil), "RefreshImageResponse")
+}
+
+func init() { proto.RegisterFile("control.proto", fileDescriptor_0c5120591600887d) }
+
+var fileDescriptor_0c5120591600887d = []byte{
+	// 348 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x92, 0xcf, 0x6a, 0xc2, 0x40,
+	0x10, 0xc6, 0x49, 0xad, 0x56, 0x47, 0xed, 0x61, 0x55, 0x08, 0x42, 0x21, 0x4d, 0xb1, 0x78, 0x69,
+	0x04, 0x7b, 0x2c, 0xf4, 0xa0, 0xa5, 0x20, 0x78, 0x28, 0xdb, 0x5b, 0x2f, 0x61, 0x93, 0x4c, 0xfe,
+	0x60, 0xdc, 0x4d, 0x77, 0x37, 0x48, 0xfb, 0x82, 0x7d, 0xad, 0x92, 0x4d, 0xb5, 0x16, 0xbc, 0xf5,
+	0x38, 0xdf, 0x6f, 0x76, 0xe6, 0x9b, 0x99, 0x85, 0x7e, 0x28, 0xb8, 0x96, 0x22, 0xf7, 0x0a, 0x29,
+	0xb4, 0x70, 0x57, 0xd0, 0x59, 0xb3, 0x0f, 0x94, 0x2f, 0x2c, 0x93, 0xe4, 0x0a, 0x40, 0xe4, 0x91,
+	0x1f, 0x65, 0x09, 0x2a, 0x6d, 0x5b, 0x8e, 0x35, 0xed, 0xd0, 0x8e, 0xc8, 0xa3, 0x27, 0x23, 0x54,
+	0x98, 0xe3, 0x6e, 0x8f, 0xcf, 0x6a, 0xcc, 0x71, 0x57, 0x63, 0x77, 0x03, 0x03, 0x8a, 0xb1, 0x44,
+	0x95, 0xae, 0xb6, 0x2c, 0x41, 0x8a, 0xef, 0x65, 0xf5, 0xca, 0x81, 0x66, 0xc1, 0x32, 0xa9, 0x6c,
+	0xcb, 0x69, 0x4c, 0xbb, 0x73, 0xf0, 0x0e, 0xfd, 0x68, 0x0d, 0xc8, 0x1c, 0x46, 0xbb, 0x4c, 0xa7,
+	0x7e, 0xc0, 0xc2, 0x4d, 0x22, 0x45, 0xc9, 0x23, 0x3f, 0x46, 0x1d, 0xa6, 0xa6, 0x45, 0x9b, 0x0e,
+	0x2a, 0xb8, 0x38, 0xb0, 0xe7, 0x0a, 0xb9, 0x5f, 0x16, 0x74, 0x4d, 0x21, 0x8a, 0xaa, 0xcc, 0xf5,
+	0xff, 0xac, 0x93, 0x21, 0x34, 0x51, 0x4a, 0x21, 0xed, 0x86, 0x21, 0x75, 0x40, 0xc6, 0xd0, 0x8e,
+	0x59, 0x9e, 0x57, 0xb6, 0xec, 0x73, 0x63, 0xe5, 0x10, 0x93, 0x09, 0x5c, 0x86, 0x29, 0xe3, 0x09,
+	0x46, 0x7e, 0x98, 0x96, 0x7c, 0xa3, 0xec, 0xa6, 0x63, 0x4d, 0x1b, 0xb4, 0xff, 0xa3, 0x2e, 0x8d,
+	0x48, 0xae, 0xa1, 0xc7, 0xa2, 0xe8, 0x37, 0xa9, 0x65, 0x92, 0xba, 0x46, 0xab, 0x53, 0xdc, 0x47,
+	0x18, 0xfe, 0x5d, 0x9b, 0x2a, 0x04, 0x57, 0x48, 0x6e, 0xe1, 0x42, 0x9a, 0xd9, 0xf6, 0x9b, 0xeb,
+	0x79, 0x47, 0x03, 0xd3, 0x3d, 0x9c, 0xaf, 0xa1, 0xff, 0xaa, 0x99, 0x4c, 0x3e, 0x97, 0xf5, 0x61,
+	0xc9, 0x03, 0xf4, 0x8e, 0x0b, 0x92, 0xa1, 0x77, 0xe2, 0x2c, 0xe3, 0x91, 0x77, 0xaa, 0xeb, 0x62,
+	0xf2, 0x76, 0x93, 0x64, 0x3a, 0x2d, 0x03, 0x2f, 0x14, 0xdb, 0x99, 0x32, 0x85, 0xef, 0x14, 0x67,
+	0x85, 0x4a, 0x85, 0xd6, 0x28, 0x67, 0xb1, 0x9a, 0x15, 0x41, 0xd0, 0x32, 0xbf, 0xe7, 0xfe, 0x3b,
+	0x00, 0x00, 0xff, 0xff, 0x72, 0x30, 0x3e, 0x55, 0x4e, 0x02, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -116,8 +282,10 @@ var _ grpc.ClientConn
 const _ = grpc.SupportPackageIsVersion4
 
 // StargzControlClient is the client API for StargzControl service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type StargzControlClient interface {
-	RefreshLayer(ctx context.Context, in *RefreshLayerRequest, opts ...grpc.CallOption) (*RefreshLayerResponse, error)
+	RefreshImage(ctx context.Context, in *RefreshImageRequest, opts ...grpc.CallOption) (*RefreshImageResponse, error)
 }
 
 type stargzControlClient struct {
@@ -128,9 +296,9 @@ func NewStargzControlClient(cc *grpc.ClientConn) StargzControlClient {
 	return &stargzControlClient{cc}
 }
 
-func (c *stargzControlClient) RefreshLayer(ctx context.Context, in *RefreshLayerRequest, opts ...grpc.CallOption) (*RefreshLayerResponse, error) {
-	out := new(RefreshLayerResponse)
-	err := c.cc.Invoke(ctx, "/StargzControl/RefreshLayer", in, out, opts...)
+func (c *stargzControlClient) RefreshImage(ctx context.Context, in *RefreshImageRequest, opts ...grpc.CallOption) (*RefreshImageResponse, error) {
+	out := new(RefreshImageResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/RefreshImage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,35 +307,35 @@ func (c *stargzControlClient) RefreshLayer(ctx context.Context, in *RefreshLayer
 
 // StargzControlServer is the server API for StargzControl service.
 type StargzControlServer interface {
-	RefreshLayer(context.Context, *RefreshLayerRequest) (*RefreshLayerResponse, error)
+	RefreshImage(context.Context, *RefreshImageRequest) (*RefreshImageResponse, error)
 }
 
 // UnimplementedStargzControlServer can be embedded to have forward compatible implementations.
 type UnimplementedStargzControlServer struct {
 }
 
-func (*UnimplementedStargzControlServer) RefreshLayer(ctx context.Context, req *RefreshLayerRequest) (*RefreshLayerResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RefreshLayer not implemented")
+func (*UnimplementedStargzControlServer) RefreshImage(ctx context.Context, req *RefreshImageRequest) (*RefreshImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RefreshImage not implemented")
 }
 
 func RegisterStargzControlServer(s *grpc.Server, srv StargzControlServer) {
 	s.RegisterService(&_StargzControl_serviceDesc, srv)
 }
 
-func _StargzControl_RefreshLayer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RefreshLayerRequest)
+func _StargzControl_RefreshImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshImageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StargzControlServer).RefreshLayer(ctx, in)
+		return srv.(StargzControlServer).RefreshImage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/StargzControl/RefreshLayer",
+		FullMethod: "/StargzControl/RefreshImage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StargzControlServer).RefreshLayer(ctx, req.(*RefreshLayerRequest))
+		return srv.(StargzControlServer).RefreshImage(ctx, req.(*RefreshImageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -177,8 +345,8 @@ var _StargzControl_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*StargzControlServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RefreshLayer",
-			Handler:    _StargzControl_RefreshLayer_Handler,
+			MethodName: "RefreshImage",
+			Handler:    _StargzControl_RefreshImage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

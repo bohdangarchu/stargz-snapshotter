@@ -25,7 +25,18 @@ import (
 
 // LayerRefresher is the interface that the filesystem must implement for layer refresh.
 type LayerRefresher interface {
-	RefreshLayer(ctx context.Context, oldDigest, newDigest digest.Digest, withBackgroundFetch bool) error
+	// RefreshImage refreshes a list of (old, new) layer digest pairs as a single
+	// best-effort batch. The implementation must populate every returned
+	// LayerResult with the corresponding old/new digest strings; the Error field
+	// is empty on success and populated otherwise. Pairs that fail individually
+	// do not abort the rest of the batch.
+	RefreshImage(ctx context.Context, pairs []ImageLayerPair, withBackgroundFetch bool) ([]*LayerResult, error)
+}
+
+// ImageLayerPair is the daemon-side input form of a single layer refresh pair.
+type ImageLayerPair struct {
+	OldDigest digest.Digest
+	NewDigest digest.Digest
 }
 
 type controlServer struct {
@@ -38,17 +49,25 @@ func NewControlServer(refresher LayerRefresher) StargzControlServer {
 	return &controlServer{refresher: refresher}
 }
 
-func (s *controlServer) RefreshLayer(ctx context.Context, req *RefreshLayerRequest) (*RefreshLayerResponse, error) {
-	oldDigest, err := digest.Parse(req.OldDigest)
+func (s *controlServer) RefreshImage(ctx context.Context, req *RefreshImageRequest) (*RefreshImageResponse, error) {
+	pairs := make([]ImageLayerPair, 0, len(req.Pairs))
+	for i, p := range req.Pairs {
+		if p == nil {
+			return nil, fmt.Errorf("pair %d is nil", i)
+		}
+		oldDgst, err := digest.Parse(p.OldDigest)
+		if err != nil {
+			return nil, fmt.Errorf("pair %d invalid old digest %q: %w", i, p.OldDigest, err)
+		}
+		newDgst, err := digest.Parse(p.NewDigest)
+		if err != nil {
+			return nil, fmt.Errorf("pair %d invalid new digest %q: %w", i, p.NewDigest, err)
+		}
+		pairs = append(pairs, ImageLayerPair{OldDigest: oldDgst, NewDigest: newDgst})
+	}
+	results, err := s.refresher.RefreshImage(ctx, pairs, req.WithBackgroundFetch)
 	if err != nil {
-		return nil, fmt.Errorf("invalid old digest %q: %w", req.OldDigest, err)
+		return nil, fmt.Errorf("failed to refresh image: %w", err)
 	}
-	newDigest, err := digest.Parse(req.NewDigest)
-	if err != nil {
-		return nil, fmt.Errorf("invalid new digest %q: %w", req.NewDigest, err)
-	}
-	if err := s.refresher.RefreshLayer(ctx, oldDigest, newDigest, req.WithBackgroundFetch); err != nil {
-		return nil, fmt.Errorf("failed to refresh layer: %w", err)
-	}
-	return &RefreshLayerResponse{}, nil
+	return &RefreshImageResponse{Results: results}, nil
 }
