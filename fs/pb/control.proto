@@ -20,6 +20,9 @@ option go_package = "github.com/stargz-snapshotter/fs/pb";
 
 service StargzControl {
   rpc RefreshImage(RefreshImageRequest) returns (RefreshImageResponse);
+  rpc Watch(WatchRequest) returns (WatchResponse);
+  rpc Unwatch(UnwatchRequest) returns (UnwatchResponse);
+  rpc WatchList(WatchListRequest) returns (WatchListResponse);
 }
 
 message LayerPair {
@@ -50,4 +53,47 @@ message LayerResult {
 
 message RefreshImageResponse {
   repeated LayerResult results = 1;
+}
+
+message WatchLayer {
+  string digest = 1;
+  string toc_digest = 2;
+  string media_type = 3;
+}
+
+message WatchRequest {
+  string ref = 1;
+  repeated WatchLayer layers = 2;
+  // Source labels so the daemon can resolve
+  // registry hosts and credentials for the polling loop.
+  map<string, string> labels = 3;
+  // Polling interval. 0 -> daemon default.
+  int64 interval_seconds = 4;
+  bool with_background_fetch = 5;
+}
+
+message WatchResponse {
+  string error = 1;
+}
+
+message UnwatchRequest {
+  string ref = 1;
+}
+
+message UnwatchResponse {
+  string error = 1;
+}
+
+message WatchListRequest {}
+
+message WatchEntry {
+  string ref = 1;
+  string last_manifest_digest = 2;
+  int64 last_poll_unix = 3;
+  int32 consecutive_failures = 4;
+  int64 interval_seconds = 5;
+}
+
+message WatchListResponse {
+  repeated WatchEntry entries = 1;
 }

@@ -195,6 +195,7 @@ func NewFilesystem(root string, cfg config.Config, opts ...Option) (_ snapshot.F
 		metricsController:     metricsCtr,
 		attrTimeout:           attrTimeout,
 		entryTimeout:          entryTimeout,
+		subs:                  make(map[string]*subscription),
 	}, nil
 }
 
@@ -213,6 +214,8 @@ type filesystem struct {
 	metricsController     *layermetrics.Controller
 	attrTimeout           time.Duration
 	entryTimeout          time.Duration
+	subsMu                sync.Mutex
+	subs                  map[string]*subscription
 }
 
 func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) (retErr error) {
@@ -499,12 +502,16 @@ func (fs *filesystem) RefreshImage(ctx context.Context, pairs []pb.ImageLayerPai
 			results = append(results, res)
 			continue
 		}
+		fields := log.Fields{}
 		if delta != nil {
 			res.Fallback = delta.Fallback
 			res.ChangedChunks = int64(len(delta.ChangedChunks))
 			res.AddedChunks = int64(len(delta.AddedChunks))
+			fields["changed_chunks"] = res.ChangedChunks
+			fields["added_chunks"] = res.AddedChunks
+			fields["fallback"] = delta.Fallback
 		}
-		log.G(pairCtx).Info("layer blob refreshed successfully")
+		log.G(pairCtx).WithFields(fields).Info("layer blob refreshed successfully")
 
 		if withBackgroundFetch {
 			go runBackgroundFetchAfterRefresh(pairCtx, targetLayer, delta)
@@ -552,12 +559,14 @@ func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
 		fs.layerMu.Unlock()
 		return fmt.Errorf("specified path %q isn't a mountpoint", mountpoint)
 	}
-	delete(fs.layer, mountpoint)      // unregisters the corresponding layer
+	delete(fs.layer, mountpoint) // unregisters the corresponding layer
+	layerDigest := l.Info().Digest
 	if err := l.Close(); err != nil { // Cleanup associated resources
 		log.G(ctx).WithError(err).Warn("failed to release resources of the layer")
 	}
 	fs.layerMu.Unlock()
 	fs.metricsController.Remove(mountpoint)
+	fs.dropSubscriptionsForLayer(layerDigest)
 
 	if err := unmount(mountpoint, 0); err != nil {
 		if err != unix.EBUSY {

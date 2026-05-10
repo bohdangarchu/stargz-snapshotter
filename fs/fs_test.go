@@ -91,5 +91,11 @@ func (l *breakableLayer) Refresh(ctx context.Context, hosts source.RegistryHosts
 	}
 	return nil
 }
+func (l *breakableLayer) RefreshBlob(context.Context, ocispec.Descriptor, digest.Digest) (*layer.DeltaResult, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (l *breakableLayer) BackgroundFetchChunks(context.Context, []layer.ChunkRef) error {
+	return fmt.Errorf("not implemented")
+}
 func (l *breakableLayer) Done()        {}
 func (l *breakableLayer) Close() error { return nil }

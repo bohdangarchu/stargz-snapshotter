@@ -246,40 +246,451 @@ func (m *RefreshImageResponse) GetResults() []*LayerResult {
 	return nil
 }
 
+type WatchLayer struct {
+	Digest               string   `protobuf:"bytes,1,opt,name=digest,proto3" json:"digest,omitempty"`
+	TocDigest            string   `protobuf:"bytes,2,opt,name=toc_digest,json=tocDigest,proto3" json:"toc_digest,omitempty"`
+	MediaType            string   `protobuf:"bytes,3,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchLayer) Reset()         { *m = WatchLayer{} }
+func (m *WatchLayer) String() string { return proto.CompactTextString(m) }
+func (*WatchLayer) ProtoMessage()    {}
+func (*WatchLayer) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{4}
+}
+func (m *WatchLayer) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchLayer.Unmarshal(m, b)
+}
+func (m *WatchLayer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchLayer.Marshal(b, m, deterministic)
+}
+func (m *WatchLayer) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchLayer.Merge(m, src)
+}
+func (m *WatchLayer) XXX_Size() int {
+	return xxx_messageInfo_WatchLayer.Size(m)
+}
+func (m *WatchLayer) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchLayer.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchLayer proto.InternalMessageInfo
+
+func (m *WatchLayer) GetDigest() string {
+	if m != nil {
+		return m.Digest
+	}
+	return ""
+}
+
+func (m *WatchLayer) GetTocDigest() string {
+	if m != nil {
+		return m.TocDigest
+	}
+	return ""
+}
+
+func (m *WatchLayer) GetMediaType() string {
+	if m != nil {
+		return m.MediaType
+	}
+	return ""
+}
+
+type WatchRequest struct {
+	Ref    string        `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Layers []*WatchLayer `protobuf:"bytes,2,rep,name=layers,proto3" json:"layers,omitempty"`
+	// Source labels (same ones used at Mount time) so the daemon can resolve
+	// registry hosts and credentials for the polling loop.
+	Labels map[string]string `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Polling interval. 0 -> daemon default.
+	IntervalSeconds      int64    `protobuf:"varint,4,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	WithBackgroundFetch  bool     `protobuf:"varint,5,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchRequest) Reset()         { *m = WatchRequest{} }
+func (m *WatchRequest) String() string { return proto.CompactTextString(m) }
+func (*WatchRequest) ProtoMessage()    {}
+func (*WatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{5}
+}
+func (m *WatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchRequest.Unmarshal(m, b)
+}
+func (m *WatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchRequest.Marshal(b, m, deterministic)
+}
+func (m *WatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchRequest.Merge(m, src)
+}
+func (m *WatchRequest) XXX_Size() int {
+	return xxx_messageInfo_WatchRequest.Size(m)
+}
+func (m *WatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchRequest proto.InternalMessageInfo
+
+func (m *WatchRequest) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+func (m *WatchRequest) GetLayers() []*WatchLayer {
+	if m != nil {
+		return m.Layers
+	}
+	return nil
+}
+
+func (m *WatchRequest) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+func (m *WatchRequest) GetIntervalSeconds() int64 {
+	if m != nil {
+		return m.IntervalSeconds
+	}
+	return 0
+}
+
+func (m *WatchRequest) GetWithBackgroundFetch() bool {
+	if m != nil {
+		return m.WithBackgroundFetch
+	}
+	return false
+}
+
+type WatchResponse struct {
+	// Empty on success; populated with the failure reason otherwise.
+	Error                string   `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchResponse) Reset()         { *m = WatchResponse{} }
+func (m *WatchResponse) String() string { return proto.CompactTextString(m) }
+func (*WatchResponse) ProtoMessage()    {}
+func (*WatchResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{6}
+}
+func (m *WatchResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchResponse.Unmarshal(m, b)
+}
+func (m *WatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchResponse.Marshal(b, m, deterministic)
+}
+func (m *WatchResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchResponse.Merge(m, src)
+}
+func (m *WatchResponse) XXX_Size() int {
+	return xxx_messageInfo_WatchResponse.Size(m)
+}
+func (m *WatchResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchResponse proto.InternalMessageInfo
+
+func (m *WatchResponse) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+type UnwatchRequest struct {
+	Ref                  string   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *UnwatchRequest) Reset()         { *m = UnwatchRequest{} }
+func (m *UnwatchRequest) String() string { return proto.CompactTextString(m) }
+func (*UnwatchRequest) ProtoMessage()    {}
+func (*UnwatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{7}
+}
+func (m *UnwatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UnwatchRequest.Unmarshal(m, b)
+}
+func (m *UnwatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UnwatchRequest.Marshal(b, m, deterministic)
+}
+func (m *UnwatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UnwatchRequest.Merge(m, src)
+}
+func (m *UnwatchRequest) XXX_Size() int {
+	return xxx_messageInfo_UnwatchRequest.Size(m)
+}
+func (m *UnwatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_UnwatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UnwatchRequest proto.InternalMessageInfo
+
+func (m *UnwatchRequest) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+type UnwatchResponse struct {
+	Error                string   `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *UnwatchResponse) Reset()         { *m = UnwatchResponse{} }
+func (m *UnwatchResponse) String() string { return proto.CompactTextString(m) }
+func (*UnwatchResponse) ProtoMessage()    {}
+func (*UnwatchResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{8}
+}
+func (m *UnwatchResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UnwatchResponse.Unmarshal(m, b)
+}
+func (m *UnwatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UnwatchResponse.Marshal(b, m, deterministic)
+}
+func (m *UnwatchResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UnwatchResponse.Merge(m, src)
+}
+func (m *UnwatchResponse) XXX_Size() int {
+	return xxx_messageInfo_UnwatchResponse.Size(m)
+}
+func (m *UnwatchResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_UnwatchResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UnwatchResponse proto.InternalMessageInfo
+
+func (m *UnwatchResponse) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+type WatchListRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchListRequest) Reset()         { *m = WatchListRequest{} }
+func (m *WatchListRequest) String() string { return proto.CompactTextString(m) }
+func (*WatchListRequest) ProtoMessage()    {}
+func (*WatchListRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{9}
+}
+func (m *WatchListRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchListRequest.Unmarshal(m, b)
+}
+func (m *WatchListRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchListRequest.Marshal(b, m, deterministic)
+}
+func (m *WatchListRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchListRequest.Merge(m, src)
+}
+func (m *WatchListRequest) XXX_Size() int {
+	return xxx_messageInfo_WatchListRequest.Size(m)
+}
+func (m *WatchListRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchListRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchListRequest proto.InternalMessageInfo
+
+type WatchEntry struct {
+	Ref                  string   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	LastManifestDigest   string   `protobuf:"bytes,2,opt,name=last_manifest_digest,json=lastManifestDigest,proto3" json:"last_manifest_digest,omitempty"`
+	LastPollUnix         int64    `protobuf:"varint,3,opt,name=last_poll_unix,json=lastPollUnix,proto3" json:"last_poll_unix,omitempty"`
+	ConsecutiveFailures  int32    `protobuf:"varint,4,opt,name=consecutive_failures,json=consecutiveFailures,proto3" json:"consecutive_failures,omitempty"`
+	IntervalSeconds      int64    `protobuf:"varint,5,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchEntry) Reset()         { *m = WatchEntry{} }
+func (m *WatchEntry) String() string { return proto.CompactTextString(m) }
+func (*WatchEntry) ProtoMessage()    {}
+func (*WatchEntry) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{10}
+}
+func (m *WatchEntry) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchEntry.Unmarshal(m, b)
+}
+func (m *WatchEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchEntry.Marshal(b, m, deterministic)
+}
+func (m *WatchEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchEntry.Merge(m, src)
+}
+func (m *WatchEntry) XXX_Size() int {
+	return xxx_messageInfo_WatchEntry.Size(m)
+}
+func (m *WatchEntry) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchEntry.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchEntry proto.InternalMessageInfo
+
+func (m *WatchEntry) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+func (m *WatchEntry) GetLastManifestDigest() string {
+	if m != nil {
+		return m.LastManifestDigest
+	}
+	return ""
+}
+
+func (m *WatchEntry) GetLastPollUnix() int64 {
+	if m != nil {
+		return m.LastPollUnix
+	}
+	return 0
+}
+
+func (m *WatchEntry) GetConsecutiveFailures() int32 {
+	if m != nil {
+		return m.ConsecutiveFailures
+	}
+	return 0
+}
+
+func (m *WatchEntry) GetIntervalSeconds() int64 {
+	if m != nil {
+		return m.IntervalSeconds
+	}
+	return 0
+}
+
+type WatchListResponse struct {
+	Entries              []*WatchEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
+}
+
+func (m *WatchListResponse) Reset()         { *m = WatchListResponse{} }
+func (m *WatchListResponse) String() string { return proto.CompactTextString(m) }
+func (*WatchListResponse) ProtoMessage()    {}
+func (*WatchListResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{11}
+}
+func (m *WatchListResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchListResponse.Unmarshal(m, b)
+}
+func (m *WatchListResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchListResponse.Marshal(b, m, deterministic)
+}
+func (m *WatchListResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchListResponse.Merge(m, src)
+}
+func (m *WatchListResponse) XXX_Size() int {
+	return xxx_messageInfo_WatchListResponse.Size(m)
+}
+func (m *WatchListResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchListResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchListResponse proto.InternalMessageInfo
+
+func (m *WatchListResponse) GetEntries() []*WatchEntry {
+	if m != nil {
+		return m.Entries
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*LayerPair)(nil), "LayerPair")
 	proto.RegisterType((*RefreshImageRequest)(nil), "RefreshImageRequest")
 	proto.RegisterType((*LayerResult)(nil), "LayerResult")
 	proto.RegisterType((*RefreshImageResponse)(nil), "RefreshImageResponse")
+	proto.RegisterType((*WatchLayer)(nil), "WatchLayer")
+	proto.RegisterType((*WatchRequest)(nil), "WatchRequest")
+	proto.RegisterMapType((map[string]string)(nil), "WatchRequest.LabelsEntry")
+	proto.RegisterType((*WatchResponse)(nil), "WatchResponse")
+	proto.RegisterType((*UnwatchRequest)(nil), "UnwatchRequest")
+	proto.RegisterType((*UnwatchResponse)(nil), "UnwatchResponse")
+	proto.RegisterType((*WatchListRequest)(nil), "WatchListRequest")
+	proto.RegisterType((*WatchEntry)(nil), "WatchEntry")
+	proto.RegisterType((*WatchListResponse)(nil), "WatchListResponse")
 }
 
 func init() { proto.RegisterFile("control.proto", fileDescriptor_0c5120591600887d) }
 
 var fileDescriptor_0c5120591600887d = []byte{
-	// 368 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x92, 0x4f, 0x6b, 0xe2, 0x40,
-	0x18, 0xc6, 0xc9, 0xba, 0xba, 0xfa, 0x1a, 0x3d, 0x8c, 0x0a, 0x41, 0x58, 0xc8, 0x66, 0xd7, 0xc5,
-	0xcb, 0x46, 0x70, 0x8f, 0x85, 0x1e, 0xb4, 0x14, 0x0a, 0x1e, 0xca, 0xb4, 0xa7, 0x5e, 0xc2, 0x64,
-	0x32, 0xf9, 0x83, 0x71, 0x26, 0x9d, 0x99, 0x10, 0xda, 0x2f, 0xd8, 0xaf, 0x55, 0x32, 0x31, 0xd6,
-	0x82, 0xb7, 0x1e, 0xe7, 0xf9, 0x3d, 0x79, 0xf3, 0x3c, 0xf3, 0x0e, 0x8c, 0xa8, 0xe0, 0x5a, 0x8a,
-	0xdc, 0x2f, 0xa4, 0xd0, 0xc2, 0x13, 0x30, 0xd8, 0x91, 0x17, 0x26, 0xef, 0x49, 0x26, 0xd1, 0x4f,
-	0x00, 0x91, 0x47, 0x41, 0x94, 0x25, 0x4c, 0x69, 0xc7, 0x72, 0xad, 0xe5, 0x00, 0x0f, 0x44, 0x1e,
-	0xdd, 0x18, 0xa1, 0xc6, 0x9c, 0x55, 0x2d, 0xfe, 0xd6, 0x60, 0xce, 0xaa, 0x23, 0xfe, 0x03, 0xe3,
-	0x1a, 0x6b, 0x41, 0x5b, 0x4b, 0xc7, 0x58, 0x6c, 0xce, 0xaa, 0x47, 0x41, 0x1b, 0x97, 0xb7, 0x87,
-	0x09, 0x66, 0xb1, 0x64, 0x2a, 0xbd, 0x3b, 0x90, 0x84, 0x61, 0xf6, 0x5c, 0xd6, 0x1f, 0xbb, 0xd0,
-	0x2d, 0x48, 0x26, 0x95, 0x63, 0xb9, 0x9d, 0xe5, 0x70, 0x0d, 0xfe, 0x29, 0x15, 0x6e, 0x00, 0x5a,
-	0xc3, 0xac, 0xca, 0x74, 0x1a, 0x84, 0x84, 0xee, 0x13, 0x29, 0x4a, 0x1e, 0x05, 0x31, 0xd3, 0x34,
-	0x35, 0x41, 0xfa, 0x78, 0x52, 0xc3, 0xcd, 0x89, 0xdd, 0xd6, 0xc8, 0x7b, 0xb3, 0x60, 0x68, 0x06,
-	0x61, 0xa6, 0xca, 0x5c, 0x7f, 0xb1, 0xe0, 0x14, 0xba, 0x4c, 0x4a, 0x21, 0x8f, 0xbd, 0x9a, 0x03,
-	0x9a, 0x43, 0x3f, 0x26, 0x79, 0x5e, 0xc7, 0x72, 0xbe, 0x9b, 0x28, 0xa7, 0x33, 0x5a, 0xc0, 0x98,
-	0xa6, 0x84, 0x27, 0x2c, 0x0a, 0x68, 0x5a, 0xf2, 0xbd, 0x72, 0xba, 0xae, 0xb5, 0xec, 0xe0, 0xd1,
-	0x51, 0xdd, 0x1a, 0x11, 0xfd, 0x02, 0x9b, 0x44, 0xd1, 0x87, 0xa9, 0x67, 0x4c, 0x43, 0xa3, 0x35,
-	0x16, 0xef, 0x1a, 0xa6, 0x9f, 0xaf, 0x4d, 0x15, 0x82, 0x2b, 0x86, 0xfe, 0xc2, 0x0f, 0x69, 0xba,
-	0xb5, 0x37, 0x67, 0xfb, 0x67, 0x85, 0x71, 0x0b, 0xd7, 0x3b, 0x18, 0x3d, 0x68, 0x22, 0x93, 0xd7,
-	0x6d, 0xb3, 0x7e, 0x74, 0x05, 0xf6, 0xf9, 0x40, 0x34, 0xf5, 0x2f, 0xac, 0x65, 0x3e, 0xf3, 0x2f,
-	0xfd, 0x75, 0xb3, 0x78, 0xfa, 0x9d, 0x64, 0x3a, 0x2d, 0x43, 0x9f, 0x8a, 0xc3, 0x4a, 0x99, 0xc1,
-	0xff, 0x14, 0x27, 0x85, 0x4a, 0x85, 0xd6, 0x4c, 0xae, 0x62, 0xb5, 0x2a, 0xc2, 0xb0, 0x67, 0xde,
-	0xd8, 0xff, 0xf7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xa4, 0xe3, 0x23, 0x7b, 0x74, 0x02, 0x00, 0x00,
+	// 719 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x55, 0xdd, 0x6e, 0xdb, 0x36,
+	0x14, 0x86, 0xec, 0xd9, 0x89, 0x8f, 0x7f, 0xe2, 0x30, 0xce, 0xe0, 0x19, 0x18, 0xe0, 0x29, 0xf3,
+	0x96, 0x01, 0x9b, 0xb2, 0x78, 0x37, 0x5b, 0x06, 0xf4, 0x22, 0x69, 0x03, 0x14, 0x48, 0x81, 0x40,
+	0x49, 0x50, 0xa0, 0x37, 0x02, 0x2d, 0xd1, 0x96, 0x60, 0x9a, 0x54, 0x49, 0x2a, 0x8e, 0xfb, 0x18,
+	0x7d, 0xa9, 0xbe, 0x40, 0xd1, 0xe7, 0x29, 0x48, 0x51, 0x8a, 0x9d, 0x26, 0xb9, 0xe9, 0x9d, 0x79,
+	0xbe, 0x23, 0xf2, 0x7c, 0x3f, 0xa4, 0xa1, 0x1d, 0x72, 0xa6, 0x04, 0xa7, 0x5e, 0x2a, 0xb8, 0xe2,
+	0x2e, 0x87, 0xc6, 0x05, 0x5e, 0x11, 0x71, 0x89, 0x13, 0x81, 0x7e, 0x06, 0xe0, 0x34, 0x0a, 0xa2,
+	0x64, 0x46, 0xa4, 0xea, 0x3b, 0x43, 0xe7, 0xb0, 0xe1, 0x37, 0x38, 0x8d, 0x5e, 0x9a, 0x82, 0x86,
+	0x19, 0x59, 0x16, 0x70, 0x25, 0x87, 0x19, 0x59, 0x5a, 0xf8, 0x57, 0xe8, 0x68, 0x58, 0xf1, 0xb0,
+	0x68, 0xa9, 0x9a, 0x96, 0x16, 0x23, 0xcb, 0x6b, 0x1e, 0xe6, 0x5d, 0xee, 0x1c, 0xf6, 0x7c, 0x32,
+	0x15, 0x44, 0xc6, 0xaf, 0x17, 0x78, 0x46, 0x7c, 0xf2, 0x3e, 0xd3, 0x1f, 0x0f, 0xa1, 0x96, 0xe2,
+	0x44, 0xc8, 0xbe, 0x33, 0xac, 0x1e, 0x36, 0xc7, 0xe0, 0x95, 0x53, 0xf9, 0x39, 0x80, 0xc6, 0xb0,
+	0xbf, 0x4c, 0x54, 0x1c, 0x4c, 0x70, 0x38, 0x9f, 0x09, 0x9e, 0xb1, 0x28, 0x98, 0x12, 0x15, 0xc6,
+	0x66, 0x90, 0x6d, 0x7f, 0x4f, 0x83, 0xa7, 0x25, 0x76, 0xae, 0x21, 0xf7, 0x93, 0x03, 0x4d, 0xb3,
+	0x91, 0x4f, 0x64, 0x46, 0xd5, 0x77, 0x12, 0xec, 0x41, 0x8d, 0x08, 0xc1, 0x85, 0xe5, 0x95, 0x2f,
+	0xd0, 0x00, 0xb6, 0xa7, 0x98, 0x52, 0x3d, 0x56, 0xff, 0x07, 0x33, 0x4a, 0xb9, 0x46, 0x23, 0xe8,
+	0x84, 0x31, 0x66, 0x33, 0x12, 0x05, 0x61, 0x9c, 0xb1, 0xb9, 0xec, 0xd7, 0x86, 0xce, 0x61, 0xd5,
+	0x6f, 0xdb, 0xea, 0x99, 0x29, 0xa2, 0x5f, 0xa0, 0x85, 0xa3, 0xe8, 0xbe, 0xa9, 0x6e, 0x9a, 0x9a,
+	0xa6, 0x96, 0xb7, 0xb8, 0x2f, 0xa0, 0xb7, 0x29, 0x9b, 0x4c, 0x39, 0x93, 0x04, 0xfd, 0x06, 0x5b,
+	0xc2, 0x70, 0x2b, 0x94, 0x6b, 0x79, 0x6b, 0x84, 0xfd, 0x02, 0x74, 0x27, 0x00, 0x6f, 0xb1, 0x0a,
+	0x63, 0x03, 0xa2, 0x1f, 0xa1, 0xbe, 0xa1, 0x81, 0x5d, 0x69, 0x01, 0xd6, 0xec, 0xb3, 0x02, 0xa8,
+	0xc2, 0x3b, 0x0d, 0x2f, 0x48, 0x94, 0xe0, 0x40, 0xad, 0x52, 0x62, 0x55, 0x68, 0x98, 0xca, 0xf5,
+	0x2a, 0x25, 0xee, 0xc7, 0x0a, 0xb4, 0xcc, 0x21, 0x85, 0xa9, 0x5d, 0xa8, 0x0a, 0x32, 0xb5, 0x67,
+	0xe8, 0x9f, 0xe8, 0x00, 0xea, 0x54, 0x4f, 0x20, 0xfb, 0x15, 0x33, 0x6d, 0xd3, 0xbb, 0x9f, 0xca,
+	0xb7, 0x10, 0x3a, 0xd6, 0x4d, 0x13, 0x42, 0x65, 0xbf, 0x6a, 0x9a, 0x7e, 0xf2, 0xd6, 0x77, 0xf5,
+	0x2e, 0x0c, 0xf6, 0x8a, 0x29, 0xb1, 0xf2, 0x6d, 0x23, 0xfa, 0x03, 0xba, 0x09, 0x53, 0x44, 0xdc,
+	0x62, 0x1a, 0x48, 0x12, 0x72, 0x16, 0x49, 0x63, 0x46, 0xd5, 0xdf, 0x29, 0xea, 0x57, 0x79, 0xf9,
+	0xe9, 0x1c, 0xd5, 0x9e, 0xcc, 0xd1, 0xe0, 0x3f, 0x1d, 0xa3, 0xf2, 0x54, 0xcd, 0x6b, 0x4e, 0x56,
+	0x05, 0xaf, 0x39, 0x59, 0xe9, 0x68, 0xdc, 0x62, 0x9a, 0x11, 0xab, 0x59, 0xbe, 0x38, 0xa9, 0xfc,
+	0xeb, 0xb8, 0x23, 0x68, 0xdb, 0xe9, 0xad, 0x63, 0x65, 0x8a, 0x9c, 0xb5, 0x14, 0xb9, 0x2e, 0x74,
+	0x6e, 0xd8, 0xf2, 0x59, 0xf1, 0xdc, 0xdf, 0x61, 0xa7, 0xec, 0x79, 0x76, 0x33, 0x04, 0xdd, 0x5c,
+	0xd6, 0x44, 0x2a, 0xbb, 0x9d, 0xfb, 0xd9, 0xb1, 0x09, 0x28, 0x29, 0x3c, 0xb0, 0xe6, 0x6f, 0xe8,
+	0x51, 0x2c, 0x55, 0xb0, 0xc0, 0x2c, 0x99, 0x12, 0xa9, 0x36, 0x53, 0x80, 0x34, 0xf6, 0xc6, 0x42,
+	0xf7, 0x17, 0xde, 0x7c, 0x91, 0x72, 0x4a, 0x83, 0x8c, 0x25, 0x77, 0x26, 0x12, 0x55, 0xbf, 0xa5,
+	0xab, 0x97, 0x9c, 0xd2, 0x1b, 0x96, 0xdc, 0xa1, 0x63, 0xe8, 0x85, 0x7a, 0xd6, 0x30, 0x53, 0xc9,
+	0x2d, 0x09, 0xa6, 0x38, 0xa1, 0x99, 0x20, 0xb9, 0x3d, 0x35, 0x7f, 0x6f, 0x0d, 0x3b, 0xb7, 0xd0,
+	0xa3, 0x6e, 0xd6, 0x1e, 0x75, 0xd3, 0x3d, 0x81, 0xdd, 0x35, 0xaa, 0x56, 0x95, 0x11, 0x6c, 0x11,
+	0xa6, 0x44, 0x42, 0x8a, 0x4b, 0x61, 0x63, 0x96, 0x67, 0xa6, 0xc0, 0xc6, 0x5f, 0x1c, 0x68, 0x5f,
+	0x29, 0x2c, 0x66, 0x1f, 0xce, 0xf2, 0x37, 0x11, 0xfd, 0x0f, 0xad, 0xf5, 0x5b, 0x86, 0x7a, 0xde,
+	0x23, 0x6f, 0xd5, 0x60, 0xdf, 0x7b, 0xe2, 0x2a, 0xd6, 0xcc, 0x29, 0xa8, 0xbd, 0x91, 0xd7, 0x41,
+	0xc7, 0xdb, 0x0c, 0xc0, 0x9f, 0xb0, 0x65, 0x6d, 0x44, 0x3b, 0xde, 0xa6, 0xe9, 0x83, 0xae, 0xf7,
+	0xd0, 0xe1, 0x31, 0x34, 0x4a, 0x82, 0x68, 0xd7, 0x7b, 0xe8, 0xeb, 0x00, 0x79, 0xdf, 0xf0, 0x3f,
+	0x1d, 0xbd, 0x3b, 0x98, 0x25, 0x2a, 0xce, 0x26, 0x5e, 0xc8, 0x17, 0x47, 0xd2, 0x50, 0xfc, 0x4b,
+	0x32, 0x9c, 0xca, 0x98, 0x2b, 0x45, 0xc4, 0xd1, 0x54, 0x1e, 0xa5, 0x93, 0x49, 0xdd, 0xfc, 0x05,
+	0xfc, 0xf3, 0x35, 0x00, 0x00, 0xff, 0xff, 0x97, 0x8a, 0x61, 0x05, 0x13, 0x06, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -295,6 +706,9 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type StargzControlClient interface {
 	RefreshImage(ctx context.Context, in *RefreshImageRequest, opts ...grpc.CallOption) (*RefreshImageResponse, error)
+	Watch(ctx context.Context, in *WatchRequest, opts ...grpc.CallOption) (*WatchResponse, error)
+	Unwatch(ctx context.Context, in *UnwatchRequest, opts ...grpc.CallOption) (*UnwatchResponse, error)
+	WatchList(ctx context.Context, in *WatchListRequest, opts ...grpc.CallOption) (*WatchListResponse, error)
 }
 
 type stargzControlClient struct {
@@ -314,9 +728,39 @@ func (c *stargzControlClient) RefreshImage(ctx context.Context, in *RefreshImage
 	return out, nil
 }
 
+func (c *stargzControlClient) Watch(ctx context.Context, in *WatchRequest, opts ...grpc.CallOption) (*WatchResponse, error) {
+	out := new(WatchResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/Watch", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stargzControlClient) Unwatch(ctx context.Context, in *UnwatchRequest, opts ...grpc.CallOption) (*UnwatchResponse, error) {
+	out := new(UnwatchResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/Unwatch", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stargzControlClient) WatchList(ctx context.Context, in *WatchListRequest, opts ...grpc.CallOption) (*WatchListResponse, error) {
+	out := new(WatchListResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/WatchList", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StargzControlServer is the server API for StargzControl service.
 type StargzControlServer interface {
 	RefreshImage(context.Context, *RefreshImageRequest) (*RefreshImageResponse, error)
+	Watch(context.Context, *WatchRequest) (*WatchResponse, error)
+	Unwatch(context.Context, *UnwatchRequest) (*UnwatchResponse, error)
+	WatchList(context.Context, *WatchListRequest) (*WatchListResponse, error)
 }
 
 // UnimplementedStargzControlServer can be embedded to have forward compatible implementations.
@@ -325,6 +769,15 @@ type UnimplementedStargzControlServer struct {
 
 func (*UnimplementedStargzControlServer) RefreshImage(ctx context.Context, req *RefreshImageRequest) (*RefreshImageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RefreshImage not implemented")
+}
+func (*UnimplementedStargzControlServer) Watch(ctx context.Context, req *WatchRequest) (*WatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Watch not implemented")
+}
+func (*UnimplementedStargzControlServer) Unwatch(ctx context.Context, req *UnwatchRequest) (*UnwatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unwatch not implemented")
+}
+func (*UnimplementedStargzControlServer) WatchList(ctx context.Context, req *WatchListRequest) (*WatchListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WatchList not implemented")
 }
 
 func RegisterStargzControlServer(s *grpc.Server, srv StargzControlServer) {
@@ -349,6 +802,60 @@ func _StargzControl_RefreshImage_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StargzControl_Watch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).Watch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/Watch",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).Watch(ctx, req.(*WatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StargzControl_Unwatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnwatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).Unwatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/Unwatch",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).Unwatch(ctx, req.(*UnwatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StargzControl_WatchList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WatchListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).WatchList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/WatchList",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).WatchList(ctx, req.(*WatchListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _StargzControl_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "StargzControl",
 	HandlerType: (*StargzControlServer)(nil),
@@ -356,6 +863,18 @@ var _StargzControl_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshImage",
 			Handler:    _StargzControl_RefreshImage_Handler,
+		},
+		{
+			MethodName: "Watch",
+			Handler:    _StargzControl_Watch_Handler,
+		},
+		{
+			MethodName: "Unwatch",
+			Handler:    _StargzControl_Unwatch_Handler,
+		},
+		{
+			MethodName: "WatchList",
+			Handler:    _StargzControl_WatchList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

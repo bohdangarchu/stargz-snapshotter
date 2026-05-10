@@ -58,7 +58,9 @@ func main() {
 			break
 		}
 	}
-	app.Commands = append(app.Commands, commands.FanotifyCommand, commands.RefreshCommand, commands.FetchTOCCommand)
+	app.Commands = append(app.Commands,
+		commands.FanotifyCommand, commands.RefreshCommand, commands.FetchTOCCommand,
+		commands.WatchCommand, commands.UnwatchCommand, commands.WatchListCommand)
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "ctr-remote: %v\n", err)
 		os.Exit(1)
