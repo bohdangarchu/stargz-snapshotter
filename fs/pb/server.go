@@ -68,7 +68,7 @@ type SubscriptionLayer struct {
 type WatchInfo struct {
 	Ref                 string
 	LastManifestDigest  digest.Digest
-	LastPoll            time.Time
+	LastUpdate          time.Time
 	ConsecutiveFailures int
 	Interval            time.Duration
 }
@@ -173,10 +173,14 @@ func (s *controlServer) WatchList(_ context.Context, _ *WatchListRequest) (*Watc
 	infos := s.refresher.WatchList()
 	entries := make([]*WatchEntry, 0, len(infos))
 	for _, info := range infos {
+		var lastUpdateUnix int64
+		if !info.LastUpdate.IsZero() {
+			lastUpdateUnix = info.LastUpdate.Unix()
+		}
 		entries = append(entries, &WatchEntry{
 			Ref:                 info.Ref,
 			LastManifestDigest:  info.LastManifestDigest.String(),
-			LastPollUnix:        info.LastPoll.Unix(),
+			LastUpdateUnix:      lastUpdateUnix,
 			ConsecutiveFailures: int32(info.ConsecutiveFailures),
 			IntervalSeconds:     int64(info.Interval / time.Second),
 		})

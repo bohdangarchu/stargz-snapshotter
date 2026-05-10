@@ -89,7 +89,7 @@ message WatchListRequest {}
 message WatchEntry {
   string ref = 1;
   string last_manifest_digest = 2;
-  int64 last_poll_unix = 3;
+  int64 last_update_unix = 3;
   int32 consecutive_failures = 4;
   int64 interval_seconds = 5;
 }

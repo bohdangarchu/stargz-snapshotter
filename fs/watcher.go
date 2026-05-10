@@ -49,7 +49,7 @@ type subscription struct {
 	withBackgroundFetch bool
 	mu                  sync.Mutex
 	lastManifestDigest  digest.Digest
-	lastPoll            time.Time
+	lastUpdate          time.Time
 	consecFailures      int
 	cancel              context.CancelFunc
 }
@@ -129,7 +129,7 @@ func (fs *filesystem) WatchList() []pb.WatchInfo {
 		out = append(out, pb.WatchInfo{
 			Ref:                 entry.ref,
 			LastManifestDigest:  entry.lastManifestDigest,
-			LastPoll:            entry.lastPoll,
+			LastUpdate:          entry.lastUpdate,
 			ConsecutiveFailures: entry.consecFailures,
 			Interval:            entry.interval,
 		})
@@ -180,7 +180,6 @@ func (fs *filesystem) runWatch(ctx context.Context, entry *subscription) {
 
 		err := fs.pollOnce(ctx, entry)
 		entry.mu.Lock()
-		entry.lastPoll = time.Now()
 		if err != nil {
 			entry.consecFailures++
 			fails := entry.consecFailures
@@ -246,6 +245,7 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 		}).Debug("poll: manifest re-digested but layers identical")
 		entry.lastManifestDigest = manifestDigest
 		entry.layers = newLayers
+		entry.lastUpdate = time.Now()
 		return nil
 	}
 
@@ -272,6 +272,7 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 
 	entry.lastManifestDigest = manifestDigest
 	entry.layers = newLayers
+	entry.lastUpdate = time.Now()
 	return nil
 }
 

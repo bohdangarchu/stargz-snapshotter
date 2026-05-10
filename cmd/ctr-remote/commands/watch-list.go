@@ -50,14 +50,14 @@ var WatchListCommand = &cli.Command{
 			return nil
 		}
 		writer := tabwriter.NewWriter(clicontext.App.Writer, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(writer, "REF\tLAST_MANIFEST\tLAST_POLL\tINTERVAL\tFAILURES")
+		fmt.Fprintln(writer, "REF\tLAST_MANIFEST\tLAST_UPDATE\tINTERVAL\tFAILURES")
 		for _, entry := range resp.Entries {
-			lastPoll := "never"
-			if entry.LastPollUnix > 0 {
-				lastPoll = time.Unix(entry.LastPollUnix, 0).Format(time.RFC3339)
+			lastUpdate := "never"
+			if entry.LastUpdateUnix > 0 {
+				lastUpdate = time.Unix(entry.LastUpdateUnix, 0).Format(time.RFC3339)
 			}
 			fmt.Fprintf(writer, "%s\t%s\t%s\t%ds\t%d\n",
-				entry.Ref, shortDigest(entry.LastManifestDigest), lastPoll,
+				entry.Ref, shortDigest(entry.LastManifestDigest), lastUpdate,
 				entry.IntervalSeconds, entry.ConsecutiveFailures)
 		}
 		return writer.Flush()
