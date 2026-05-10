@@ -48,6 +48,7 @@ type subscription struct {
 	interval            time.Duration
 	withBackgroundFetch bool
 	mu                  sync.Mutex
+	lastDigest          digest.Digest
 	lastManifestDigest  digest.Digest
 	lastUpdate          time.Time
 	consecFailures      int
@@ -197,8 +198,6 @@ func (fs *filesystem) runWatch(ctx context.Context, entry *subscription) {
 	}
 }
 
-// pollOnce performs a single poll cycle: resolve manifest, compare digest,
-// dispatch refresh on change.
 func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 	log.G(ctx).Debug("polling registry")
 
@@ -207,30 +206,37 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 		return fmt.Errorf("build resolver: %w", err)
 	}
 
-	body, manifestDigest, err := fetchPlatformManifest(ctx, resolver, entry.ref)
+	desc, fetcher, err := resolveRef(ctx, resolver, entry.ref)
+	if err != nil {
+		return fmt.Errorf("resolve manifest: %w", err)
+	}
+
+	entry.mu.Lock()
+	if desc.Digest == entry.lastDigest {
+		entry.mu.Unlock()
+		log.G(ctx).WithField("digest", desc.Digest).Debug("poll: digest unchanged")
+		return nil
+	}
+	entry.mu.Unlock()
+
+	body, manifestDesc, err := fetchPlatformManifestBody(ctx, fetcher, desc)
 	if err != nil {
 		return fmt.Errorf("fetch manifest: %w", err)
+	}
+
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(body, &manifest); err != nil {
+		return fmt.Errorf("unmarshal manifest %s: %w", manifestDesc.Digest, err)
 	}
 
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 
-	if manifestDigest == entry.lastManifestDigest {
-		log.G(ctx).WithField("manifest", manifestDigest).Debug("poll: manifest unchanged")
-		return nil
-	}
-
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(body, &manifest); err != nil {
-		return fmt.Errorf("unmarshal manifest %s: %w", manifestDigest, err)
-	}
-
-	if entry.lastManifestDigest == "" {
-		// First successful poll: record digest and current layers without
-		// triggering a refresh — the client already supplied the layers it
-		// holds, and we only act on changes from that baseline.
-		entry.lastManifestDigest = manifestDigest
-		log.G(ctx).WithField("manifest", manifestDigest).Debug("poll: baseline established")
+	// First poll establishes a baseline
+	if entry.lastDigest == "" {
+		entry.lastDigest = desc.Digest
+		entry.lastManifestDigest = manifestDesc.Digest
+		log.G(ctx).WithField("digest", desc.Digest).Debug("poll: baseline established")
 		return nil
 	}
 
@@ -240,18 +246,19 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 	}
 	if len(pairs) == 0 {
 		log.G(ctx).WithFields(log.Fields{
-			"old_manifest": entry.lastManifestDigest,
-			"new_manifest": manifestDigest,
-		}).Debug("poll: manifest re-digested but layers identical")
-		entry.lastManifestDigest = manifestDigest
+			"old_digest": entry.lastDigest,
+			"new_digest": desc.Digest,
+		}).Debug("poll: digest changed but layers identical")
+		entry.lastDigest = desc.Digest
+		entry.lastManifestDigest = manifestDesc.Digest
 		entry.layers = newLayers
 		entry.lastUpdate = time.Now()
 		return nil
 	}
 
 	log.G(ctx).WithFields(log.Fields{
-		"old_manifest":      entry.lastManifestDigest,
-		"new_manifest":      manifestDigest,
+		"old_digest":        entry.lastDigest,
+		"new_digest":        desc.Digest,
 		"layers_to_refresh": len(pairs),
 		"layers_unchanged":  len(manifest.Layers) - len(pairs),
 	}).Info("manifest changed, dispatching refresh")
@@ -261,8 +268,8 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 		return fmt.Errorf("refresh: %w", err)
 	}
 	failed := 0
-	for _, r := range results {
-		if r.Error != "" {
+	for _, refreshed := range results {
+		if refreshed.Error != "" {
 			failed++
 		}
 	}
@@ -270,7 +277,8 @@ func (fs *filesystem) pollOnce(ctx context.Context, entry *subscription) error {
 		log.G(ctx).Warnf("watch refresh: %d/%d layers failed", failed, len(results))
 	}
 
-	entry.lastManifestDigest = manifestDigest
+	entry.lastDigest = desc.Digest
+	entry.lastManifestDigest = manifestDesc.Digest
 	entry.layers = newLayers
 	entry.lastUpdate = time.Now()
 	return nil
@@ -293,44 +301,45 @@ func (fs *filesystem) resolverForLabels(labels map[string]string) (remotes.Resol
 	return docker.NewResolver(docker.ResolverOptions{Hosts: hostFn}), nil
 }
 
-// fetchPlatformManifest resolves ref, walks one Index level if needed using
-// the default platform matcher, and returns the manifest body plus its digest.
-func fetchPlatformManifest(ctx context.Context, resolver remotes.Resolver, ref string) ([]byte, digest.Digest, error) {
+func resolveRef(ctx context.Context, resolver remotes.Resolver, ref string) (ocispec.Descriptor, remotes.Fetcher, error) {
 	name, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
-		return nil, "", fmt.Errorf("resolve %q: %w", ref, err)
+		return ocispec.Descriptor{}, nil, fmt.Errorf("resolve %q: %w", ref, err)
 	}
 	fetcher, err := resolver.Fetcher(ctx, name)
 	if err != nil {
-		return nil, "", fmt.Errorf("fetcher for %q: %w", name, err)
+		return ocispec.Descriptor{}, nil, fmt.Errorf("fetcher for %q: %w", name, err)
 	}
+	return desc, fetcher, nil
+}
 
+func fetchPlatformManifestBody(ctx context.Context, fetcher remotes.Fetcher, desc ocispec.Descriptor) ([]byte, ocispec.Descriptor, error) {
 	body, err := fetchBlob(ctx, fetcher, desc)
 	if err != nil {
-		return nil, "", err
+		return nil, ocispec.Descriptor{}, err
 	}
 	if !images.IsIndexType(desc.MediaType) {
 		if !images.IsManifestType(desc.MediaType) {
-			return nil, "", fmt.Errorf("unexpected media type %q for %s", desc.MediaType, desc.Digest)
+			return nil, ocispec.Descriptor{}, fmt.Errorf("unexpected media type %q for %s", desc.MediaType, desc.Digest)
 		}
-		return body, desc.Digest, nil
+		return body, desc, nil
 	}
 
 	var idx ocispec.Index
 	if err := json.Unmarshal(body, &idx); err != nil {
-		return nil, "", fmt.Errorf("unmarshal index %s: %w", desc.Digest, err)
+		return nil, ocispec.Descriptor{}, fmt.Errorf("unmarshal index %s: %w", desc.Digest, err)
 	}
 	matcher := platforms.Default()
 	for _, child := range idx.Manifests {
 		if child.Platform == nil || matcher.Match(*child.Platform) {
 			childBody, err := fetchBlob(ctx, fetcher, child)
 			if err != nil {
-				return nil, "", err
+				return nil, ocispec.Descriptor{}, err
 			}
-			return childBody, child.Digest, nil
+			return childBody, child, nil
 		}
 	}
-	return nil, "", fmt.Errorf("no platform match in index %s", desc.Digest)
+	return nil, ocispec.Descriptor{}, fmt.Errorf("no platform match in index %s", desc.Digest)
 }
 
 func fetchBlob(ctx context.Context, fetcher remotes.Fetcher, desc ocispec.Descriptor) ([]byte, error) {
