@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containerd/stargz-snapshotter/fs/reader"
 	"github.com/containerd/stargz-snapshotter/metadata"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 )
@@ -43,6 +44,7 @@ type DeltaResult struct {
 	FallbackReason string
 	ChangedChunks  []ChunkRef
 	AddedChunks    []ChunkRef
+	StaleCacheKeys []string
 }
 
 // deltaChunkInfo is a single chunk's metadata, indexed by file id and chunk offset.
@@ -172,6 +174,7 @@ func diffSnapshots(oldSnap, newSnap *tocSnapshot) *DeltaResult {
 	}
 
 	res := &DeltaResult{}
+	affected := make(map[uint32]struct{})
 	for id, newChunks := range newSnap.chunks {
 		oldChunks := oldSnap.chunks[id]
 		for off, ni := range newChunks {
@@ -184,6 +187,7 @@ func diffSnapshots(oldSnap, newSnap *tocSnapshot) *DeltaResult {
 			oi, exists := oldChunks[off]
 			if !exists {
 				res.AddedChunks = append(res.AddedChunks, ChunkRef{FileID: id, Offset: off, Size: ni.Size})
+				affected[id] = struct{}{}
 				continue
 			}
 			if oi.Digest == "" {
@@ -194,8 +198,17 @@ func diffSnapshots(oldSnap, newSnap *tocSnapshot) *DeltaResult {
 			}
 			if oi.Digest != ni.Digest || oi.Size != ni.Size {
 				res.ChangedChunks = append(res.ChangedChunks, ChunkRef{FileID: id, Offset: off, Size: ni.Size})
+				res.StaleCacheKeys = append(res.StaleCacheKeys, reader.GenID(id, off, oi.Size))
+				affected[id] = struct{}{}
 			}
 		}
+	}
+	for id := range affected {
+		var oldTotal int64
+		for _, c := range oldSnap.chunks[id] {
+			oldTotal += c.Size
+		}
+		res.StaleCacheKeys = append(res.StaleCacheKeys, reader.GenID(id, 0, oldTotal))
 	}
 	return res
 }

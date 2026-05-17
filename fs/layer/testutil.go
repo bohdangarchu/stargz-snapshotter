@@ -283,6 +283,7 @@ func testPrefetch(t *TestRunner, factory metadata.Store, lc layerConfig) {
 					&blobRef{blob, func(bool) {}},
 					vr,
 					nil,
+					nil,
 					reference.Spec{},
 					lc.passThroughConfig,
 					false,

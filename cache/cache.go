@@ -78,6 +78,8 @@ type BlobCache interface {
 	// from cache
 	Get(key string, opts ...Option) (Reader, error)
 
+	Remove(key string) error
+
 	// Close closes the cache
 	Close() error
 }
@@ -376,6 +378,18 @@ func (dc *directoryCache) putBuffer(b *bytes.Buffer) {
 	dc.bufPool.Put(b)
 }
 
+func (dc *directoryCache) Remove(key string) error {
+	if dc.isClosed() {
+		return fmt.Errorf("cache is already closed")
+	}
+	dc.cache.Remove(key)
+	dc.fileCache.Remove(key)
+	if err := os.Remove(dc.cachePath(key)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove cache file %q: %w", key, err)
+	}
+	return nil
+}
+
 func (dc *directoryCache) Close() error {
 	dc.closedMu.Lock()
 	defer dc.closedMu.Unlock()
@@ -435,6 +449,13 @@ func (mc *MemoryCache) Add(key string, opts ...Option) (Writer, error) {
 		},
 		abortFunc: func() error { return nil },
 	}, nil
+}
+
+func (mc *MemoryCache) Remove(key string) error {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+	delete(mc.Membuf, key)
+	return nil
 }
 
 func (mc *MemoryCache) Close() error {

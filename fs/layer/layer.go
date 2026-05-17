@@ -346,7 +346,7 @@ func (r *Resolver) Resolve(ctx context.Context, hosts source.RegistryHosts, refs
 	}
 
 	// Combine layer information together and cache it.
-	l := newLayer(r, desc, blobR, vr, hosts, refspec, passThroughConfig{
+	l := newLayer(r, desc, blobR, vr, fsCache, hosts, refspec, passThroughConfig{
 		enable:           r.config.PassThrough,
 		mergeBufferSize:  r.config.MergeBufferSize,
 		mergeWorkerCount: r.config.MergeWorkerCount,
@@ -434,6 +434,7 @@ func newLayer(
 	desc ocispec.Descriptor,
 	blob *blobRef,
 	vr *reader.VerifiableReader,
+	fsCache cache.BlobCache,
 	hosts source.RegistryHosts,
 	refspec reference.Spec,
 	pth passThroughConfig,
@@ -444,6 +445,7 @@ func newLayer(
 		desc:             desc,
 		blob:             blob,
 		verifiableReader: vr,
+		fsCache:          fsCache,
 		hosts:            hosts,
 		refspec:          refspec,
 		rr:               &readerRef{},
@@ -458,6 +460,7 @@ type layer struct {
 	desc             ocispec.Descriptor
 	blob             *blobRef
 	verifiableReader *reader.VerifiableReader
+	fsCache          cache.BlobCache
 	hosts            source.RegistryHosts
 	refspec          reference.Spec
 	rr               *readerRef // shared with FUSE nodes for atomic swap
@@ -551,23 +554,14 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor, exp
 		delta = &DeltaResult{Fallback: true, FallbackReason: "diff error: " + diffErr.Error()}
 	}
 
-	// Create a new FS cache for decompressed file data.
-	fsCache, err := newCache(filepath.Join(l.resolver.rootDir, "fscache"), l.resolver.config.FSCacheType, l.resolver.config)
+	vr, err := reader.NewReader(meta, l.fsCache, newDesc.Digest)
 	if err != nil {
 		newBlobR.done(true)
-		return nil, fmt.Errorf("failed to create fs cache: %w", err)
-	}
-
-	vr, err := reader.NewReader(meta, fsCache, newDesc.Digest)
-	if err != nil {
-		newBlobR.done(true)
-		fsCache.Close()
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
 	newReader, verifyErr := refreshVerify(vr, expectedTOC, l.resolver.config.DisableVerification, l.resolver.config.AllowNoVerification)
 	if verifyErr != nil {
 		newBlobR.done(true)
-		fsCache.Close()
 		return nil, verifyErr
 	}
 
@@ -586,14 +580,18 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor, exp
 	l.prefetchOnce = sync.Once{}
 	l.backgroundFetchOnce = sync.Once{}
 
-	// Invalidate kernel page cache so subsequent reads go through FUSE
-	// and hit the new reader instead of serving stale cached pages.
 	if l.rootInode != nil {
 		if delta.Fallback {
 			log.G(ctx).WithField("reason", delta.FallbackReason).Info("delta refresh fell back to whole-layer invalidation")
 			invalidateInodeCache(l.rootInode)
 		} else {
 			invalidateChangedChunks(l.rootInode, delta.ChangedChunks)
+		}
+	}
+
+	for _, key := range delta.StaleCacheKeys {
+		if err := l.fsCache.Remove(key); err != nil {
+			log.G(ctx).WithError(err).WithField("key", key).Warn("evict stale fscache entry")
 		}
 	}
 
