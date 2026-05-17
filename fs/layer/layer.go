@@ -581,11 +581,14 @@ func (l *layer) RefreshBlob(ctx context.Context, newDesc ocispec.Descriptor, exp
 	l.backgroundFetchOnce = sync.Once{}
 
 	if l.rootInode != nil {
+		idx := buildInodeIndex(l.rootInode)
 		if delta.Fallback {
 			log.G(ctx).WithField("reason", delta.FallbackReason).Info("delta refresh fell back to whole-layer invalidation")
 			invalidateInodeCache(l.rootInode)
+			refreshAttrs(ctx, idx, idxKeys(idx), newReader.Metadata())
 		} else {
 			invalidateChangedChunks(l.rootInode, delta.ChangedChunks)
+			refreshAttrs(ctx, idx, delta.ChangedFiles, newReader.Metadata())
 		}
 	}
 
@@ -628,6 +631,39 @@ func invalidateInodeCache(inode *fusefs.Inode) {
 	for _, child := range inode.Children() {
 		invalidateInodeCache(child)
 	}
+}
+
+// refreshAttrs reloads node attrs from the new metadata reader for the given
+// file ids and invalidates the kernel's attr cache so the next stat call is
+// forwarded back to FUSE filesystem instead of being served from cache.
+func refreshAttrs(ctx context.Context, idx map[uint32]*fusefs.Inode, ids []uint32, meta metadata.Reader) {
+	for _, id := range ids {
+		in, ok := idx[id]
+		if !ok {
+			continue
+		}
+		n, ok := in.Operations().(*node)
+		if !ok {
+			continue
+		}
+		a, err := meta.GetAttr(id)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("id", id).Warn("refresh attr: GetAttr")
+			continue
+		}
+		n.attr.Store(&a)
+		if name, parent := in.Parent(); parent != nil {
+			parent.NotifyEntry(name)
+		}
+	}
+}
+
+func idxKeys(idx map[uint32]*fusefs.Inode) []uint32 {
+	out := make([]uint32, 0, len(idx))
+	for id := range idx {
+		out = append(out, id)
+	}
+	return out
 }
 
 func (l *layer) Verify(tocDigest digest.Digest) (err error) {

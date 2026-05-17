@@ -100,11 +100,12 @@ func newNode(layerDgst digest.Digest, rr *readerRef, blob remote.Blob, baseInode
 		logFileAccess: logFileAccess,
 	}
 	ffs.s = ffs.newState(layerDgst, blob)
-	return &node{
-		id:   rootID,
-		attr: rootAttr,
-		fs:   ffs,
-	}, nil
+	n := &node{
+		id: rootID,
+		fs: ffs,
+	}
+	n.attr.Store(&rootAttr)
+	return n, nil
 }
 
 // fs contains global metadata used by nodes
@@ -131,10 +132,11 @@ func (n *node) logAccessOnce(ctx context.Context) {
 		return
 	}
 
+	a := n.loadAttr()
 	log.G(ctx).WithFields(log.Fields{
 		"layer": n.fs.layerDigest.String(),
-		"size":  n.attr.Size,
-		"mode":  fmt.Sprintf("%#o", n.attr.Mode.Perm()),
+		"size":  a.Size,
+		"mode":  fmt.Sprintf("%#o", a.Mode.Perm()),
 	}).Debugf("file accessed: %s", path.Join("/", n.Path(nil)))
 }
 
@@ -156,11 +158,15 @@ type node struct {
 	fs       *fs
 	id       uint32
 	accessed uint32
-	attr     metadata.Attr
+	attr     atomic.Pointer[metadata.Attr]
 
 	ents       []fuse.DirEntry
 	entsCached bool
 	entsMu     sync.Mutex
+}
+
+func (n *node) loadAttr() metadata.Attr {
+	return *n.attr.Load()
 }
 
 func (n *node) isRootNode() bool {
@@ -308,7 +314,7 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 				n.fs.s.report(fmt.Errorf("node.Lookup: %v", err))
 				return nil, syscall.EIO
 			}
-			entryToAttr(ino, tn.attr, &out.Attr)
+			entryToAttr(ino, tn.loadAttr(), &out.Attr)
 		case *whiteout:
 			ino, err := n.fs.inodeOfID(tn.id)
 			if err != nil {
@@ -363,11 +369,12 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fu
 		n.fs.s.report(fmt.Errorf("node.Lookup: %v", err))
 		return nil, syscall.EIO
 	}
-	return n.NewInode(ctx, &node{
-		id:   id,
-		fs:   n.fs,
-		attr: ce,
-	}, entryToAttr(ino, ce, &out.Attr)), 0
+	child := &node{
+		id: id,
+		fs: n.fs,
+	}
+	child.attr.Store(&ce)
+	return n.NewInode(ctx, child, entryToAttr(ino, ce, &out.Attr)), 0
 }
 
 var _ = (fusefs.NodeOpener)((*node)(nil))
@@ -411,14 +418,14 @@ func (n *node) Getattr(ctx context.Context, f fusefs.FileHandle, out *fuse.AttrO
 		n.fs.s.report(fmt.Errorf("node.Getattr: %v", err))
 		return syscall.EIO
 	}
-	entryToAttr(ino, n.attr, &out.Attr)
+	entryToAttr(ino, n.loadAttr(), &out.Attr)
 	return 0
 }
 
 var _ = (fusefs.NodeGetxattrer)((*node)(nil))
 
 func (n *node) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, syscall.Errno) {
-	ent := n.attr
+	ent := n.loadAttr()
 	opq := n.isOpaque()
 	for _, opaqueXattr := range n.fs.opaqueXattrs {
 		if attr == opaqueXattr && opq {
@@ -441,7 +448,7 @@ func (n *node) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, 
 var _ = (fusefs.NodeListxattrer)((*node)(nil))
 
 func (n *node) Listxattr(ctx context.Context, dest []byte) (uint32, syscall.Errno) {
-	ent := n.attr
+	ent := n.loadAttr()
 	opq := n.isOpaque()
 	var attrs []byte
 	if opq {
@@ -463,7 +470,7 @@ var _ = (fusefs.NodeReadlinker)((*node)(nil))
 
 func (n *node) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 	n.logAccessOnce(ctx)
-	ent := n.attr
+	ent := n.loadAttr()
 	return []byte(ent.LinkName), 0
 }
 
@@ -503,7 +510,7 @@ func (f *file) Getattr(ctx context.Context, out *fuse.AttrOut) syscall.Errno {
 		f.n.fs.s.report(fmt.Errorf("file.Getattr: %v", err))
 		return syscall.EIO
 	}
-	entryToAttr(ino, f.n.attr, &out.Attr)
+	entryToAttr(ino, f.n.loadAttr(), &out.Attr)
 	return 0
 }
 

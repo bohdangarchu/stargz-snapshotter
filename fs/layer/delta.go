@@ -45,6 +45,7 @@ type DeltaResult struct {
 	ChangedChunks  []ChunkRef
 	AddedChunks    []ChunkRef
 	StaleCacheKeys []string
+	ChangedFiles   []uint32
 }
 
 // deltaChunkInfo is a single chunk's metadata, indexed by file id and chunk offset.
@@ -209,6 +210,7 @@ func diffSnapshots(oldSnap, newSnap *tocSnapshot) *DeltaResult {
 			oldTotal += c.Size
 		}
 		res.StaleCacheKeys = append(res.StaleCacheKeys, reader.GenID(id, 0, oldTotal))
+		res.ChangedFiles = append(res.ChangedFiles, id)
 	}
 	return res
 }
