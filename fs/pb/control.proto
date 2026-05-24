@@ -19,13 +19,81 @@ syntax = "proto3";
 option go_package = "github.com/stargz-snapshotter/fs/pb";
 
 service StargzControl {
-  rpc RefreshLayer(RefreshLayerRequest) returns (RefreshLayerResponse);
+  rpc RefreshImage(RefreshImageRequest) returns (RefreshImageResponse);
+  rpc Watch(WatchRequest) returns (WatchResponse);
+  rpc Unwatch(UnwatchRequest) returns (UnwatchResponse);
+  rpc WatchList(WatchListRequest) returns (WatchListResponse);
 }
 
-message RefreshLayerRequest {
+message LayerPair {
   string old_digest = 1;
   string new_digest = 2;
-  bool with_background_fetch = 3;
+  string new_toc_digest = 3;
 }
 
-message RefreshLayerResponse {}
+message RefreshImageRequest {
+  repeated LayerPair pairs = 1;
+  bool with_background_fetch = 2;
+}
+
+message LayerResult {
+  string old_digest = 1;
+  string new_digest = 2;
+  // Empty on success; populated with the failure reason otherwise.
+  string error = 3;
+  // True when the per-layer refresh fell back to whole-layer invalidation
+  // instead of applying chunk-level deltas. Triggered when the old and new
+  // TOCs cannot be aligned chunk-for-chunk: entry count differs, a metadata
+  // id is present on only one side, walk order shifted (same id maps to a
+  // different (parent, name)), or any chunk lacks a ChunkDigest.
+  bool fallback = 4;
+  int64 changed_chunks = 5;
+  int64 added_chunks = 6;
+}
+
+message RefreshImageResponse {
+  repeated LayerResult results = 1;
+}
+
+message WatchLayer {
+  string digest = 1;
+  string toc_digest = 2;
+  string media_type = 3;
+}
+
+message WatchRequest {
+  string ref = 1;
+  repeated WatchLayer layers = 2;
+  // Source labels so the daemon can resolve
+  // registry hosts and credentials for the polling loop.
+  map<string, string> labels = 3;
+  // Polling interval. 0 -> daemon default.
+  int64 interval_seconds = 4;
+  bool with_background_fetch = 5;
+}
+
+message WatchResponse {
+  string error = 1;
+}
+
+message UnwatchRequest {
+  string ref = 1;
+}
+
+message UnwatchResponse {
+  string error = 1;
+}
+
+message WatchListRequest {}
+
+message WatchEntry {
+  string ref = 1;
+  string last_manifest_digest = 2;
+  int64 last_update_unix = 3;
+  int32 consecutive_failures = 4;
+  int64 interval_seconds = 5;
+}
+
+message WatchListResponse {
+  repeated WatchEntry entries = 1;
+}

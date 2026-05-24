@@ -24,87 +24,673 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type RefreshLayerRequest struct {
+type LayerPair struct {
 	OldDigest            string   `protobuf:"bytes,1,opt,name=old_digest,json=oldDigest,proto3" json:"old_digest,omitempty"`
 	NewDigest            string   `protobuf:"bytes,2,opt,name=new_digest,json=newDigest,proto3" json:"new_digest,omitempty"`
-	WithBackgroundFetch  bool     `protobuf:"varint,3,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
+	NewTocDigest         string   `protobuf:"bytes,3,opt,name=new_toc_digest,json=newTocDigest,proto3" json:"new_toc_digest,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RefreshLayerRequest) Reset()         { *m = RefreshLayerRequest{} }
-func (m *RefreshLayerRequest) String() string { return proto.CompactTextString(m) }
-func (*RefreshLayerRequest) ProtoMessage()    {}
-func (m *RefreshLayerRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RefreshLayerRequest.Unmarshal(m, b)
+func (m *LayerPair) Reset()         { *m = LayerPair{} }
+func (m *LayerPair) String() string { return proto.CompactTextString(m) }
+func (*LayerPair) ProtoMessage()    {}
+func (*LayerPair) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{0}
 }
-func (m *RefreshLayerRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RefreshLayerRequest.Marshal(b, m, deterministic)
+func (m *LayerPair) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LayerPair.Unmarshal(m, b)
 }
-func (m *RefreshLayerRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RefreshLayerRequest.Merge(m, src)
+func (m *LayerPair) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LayerPair.Marshal(b, m, deterministic)
 }
-func (m *RefreshLayerRequest) XXX_Size() int {
-	return xxx_messageInfo_RefreshLayerRequest.Size(m)
+func (m *LayerPair) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LayerPair.Merge(m, src)
 }
-func (m *RefreshLayerRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_RefreshLayerRequest.DiscardUnknown(m)
+func (m *LayerPair) XXX_Size() int {
+	return xxx_messageInfo_LayerPair.Size(m)
+}
+func (m *LayerPair) XXX_DiscardUnknown() {
+	xxx_messageInfo_LayerPair.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_RefreshLayerRequest proto.InternalMessageInfo
+var xxx_messageInfo_LayerPair proto.InternalMessageInfo
 
-func (m *RefreshLayerRequest) GetOldDigest() string {
+func (m *LayerPair) GetOldDigest() string {
 	if m != nil {
 		return m.OldDigest
 	}
 	return ""
 }
 
-func (m *RefreshLayerRequest) GetNewDigest() string {
+func (m *LayerPair) GetNewDigest() string {
 	if m != nil {
 		return m.NewDigest
 	}
 	return ""
 }
 
-func (m *RefreshLayerRequest) GetWithBackgroundFetch() bool {
+func (m *LayerPair) GetNewTocDigest() string {
+	if m != nil {
+		return m.NewTocDigest
+	}
+	return ""
+}
+
+type RefreshImageRequest struct {
+	Pairs                []*LayerPair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
+	WithBackgroundFetch  bool         `protobuf:"varint,2,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *RefreshImageRequest) Reset()         { *m = RefreshImageRequest{} }
+func (m *RefreshImageRequest) String() string { return proto.CompactTextString(m) }
+func (*RefreshImageRequest) ProtoMessage()    {}
+func (*RefreshImageRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{1}
+}
+func (m *RefreshImageRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RefreshImageRequest.Unmarshal(m, b)
+}
+func (m *RefreshImageRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RefreshImageRequest.Marshal(b, m, deterministic)
+}
+func (m *RefreshImageRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefreshImageRequest.Merge(m, src)
+}
+func (m *RefreshImageRequest) XXX_Size() int {
+	return xxx_messageInfo_RefreshImageRequest.Size(m)
+}
+func (m *RefreshImageRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_RefreshImageRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RefreshImageRequest proto.InternalMessageInfo
+
+func (m *RefreshImageRequest) GetPairs() []*LayerPair {
+	if m != nil {
+		return m.Pairs
+	}
+	return nil
+}
+
+func (m *RefreshImageRequest) GetWithBackgroundFetch() bool {
 	if m != nil {
 		return m.WithBackgroundFetch
 	}
 	return false
 }
 
-type RefreshLayerResponse struct {
+type LayerResult struct {
+	OldDigest string `protobuf:"bytes,1,opt,name=old_digest,json=oldDigest,proto3" json:"old_digest,omitempty"`
+	NewDigest string `protobuf:"bytes,2,opt,name=new_digest,json=newDigest,proto3" json:"new_digest,omitempty"`
+	// Empty on success; populated with the failure reason otherwise.
+	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	// True when the per-layer refresh fell back to whole-layer invalidation
+	// instead of applying chunk-level deltas. Triggered when the old and new
+	// TOCs cannot be aligned chunk-for-chunk: entry count differs, a metadata
+	// id is present on only one side, walk order shifted (same id maps to a
+	// different (parent, name)), or any chunk lacks a ChunkDigest.
+	Fallback             bool     `protobuf:"varint,4,opt,name=fallback,proto3" json:"fallback,omitempty"`
+	ChangedChunks        int64    `protobuf:"varint,5,opt,name=changed_chunks,json=changedChunks,proto3" json:"changed_chunks,omitempty"`
+	AddedChunks          int64    `protobuf:"varint,6,opt,name=added_chunks,json=addedChunks,proto3" json:"added_chunks,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RefreshLayerResponse) Reset()         { *m = RefreshLayerResponse{} }
-func (m *RefreshLayerResponse) String() string { return proto.CompactTextString(m) }
-func (*RefreshLayerResponse) ProtoMessage()    {}
-func (m *RefreshLayerResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RefreshLayerResponse.Unmarshal(m, b)
+func (m *LayerResult) Reset()         { *m = LayerResult{} }
+func (m *LayerResult) String() string { return proto.CompactTextString(m) }
+func (*LayerResult) ProtoMessage()    {}
+func (*LayerResult) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{2}
 }
-func (m *RefreshLayerResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RefreshLayerResponse.Marshal(b, m, deterministic)
+func (m *LayerResult) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LayerResult.Unmarshal(m, b)
 }
-func (m *RefreshLayerResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RefreshLayerResponse.Merge(m, src)
+func (m *LayerResult) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LayerResult.Marshal(b, m, deterministic)
 }
-func (m *RefreshLayerResponse) XXX_Size() int {
-	return xxx_messageInfo_RefreshLayerResponse.Size(m)
+func (m *LayerResult) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LayerResult.Merge(m, src)
 }
-func (m *RefreshLayerResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_RefreshLayerResponse.DiscardUnknown(m)
+func (m *LayerResult) XXX_Size() int {
+	return xxx_messageInfo_LayerResult.Size(m)
+}
+func (m *LayerResult) XXX_DiscardUnknown() {
+	xxx_messageInfo_LayerResult.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_RefreshLayerResponse proto.InternalMessageInfo
+var xxx_messageInfo_LayerResult proto.InternalMessageInfo
+
+func (m *LayerResult) GetOldDigest() string {
+	if m != nil {
+		return m.OldDigest
+	}
+	return ""
+}
+
+func (m *LayerResult) GetNewDigest() string {
+	if m != nil {
+		return m.NewDigest
+	}
+	return ""
+}
+
+func (m *LayerResult) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+func (m *LayerResult) GetFallback() bool {
+	if m != nil {
+		return m.Fallback
+	}
+	return false
+}
+
+func (m *LayerResult) GetChangedChunks() int64 {
+	if m != nil {
+		return m.ChangedChunks
+	}
+	return 0
+}
+
+func (m *LayerResult) GetAddedChunks() int64 {
+	if m != nil {
+		return m.AddedChunks
+	}
+	return 0
+}
+
+type RefreshImageResponse struct {
+	Results              []*LayerResult `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
+}
+
+func (m *RefreshImageResponse) Reset()         { *m = RefreshImageResponse{} }
+func (m *RefreshImageResponse) String() string { return proto.CompactTextString(m) }
+func (*RefreshImageResponse) ProtoMessage()    {}
+func (*RefreshImageResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{3}
+}
+func (m *RefreshImageResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RefreshImageResponse.Unmarshal(m, b)
+}
+func (m *RefreshImageResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RefreshImageResponse.Marshal(b, m, deterministic)
+}
+func (m *RefreshImageResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefreshImageResponse.Merge(m, src)
+}
+func (m *RefreshImageResponse) XXX_Size() int {
+	return xxx_messageInfo_RefreshImageResponse.Size(m)
+}
+func (m *RefreshImageResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_RefreshImageResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RefreshImageResponse proto.InternalMessageInfo
+
+func (m *RefreshImageResponse) GetResults() []*LayerResult {
+	if m != nil {
+		return m.Results
+	}
+	return nil
+}
+
+type WatchLayer struct {
+	Digest               string   `protobuf:"bytes,1,opt,name=digest,proto3" json:"digest,omitempty"`
+	TocDigest            string   `protobuf:"bytes,2,opt,name=toc_digest,json=tocDigest,proto3" json:"toc_digest,omitempty"`
+	MediaType            string   `protobuf:"bytes,3,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchLayer) Reset()         { *m = WatchLayer{} }
+func (m *WatchLayer) String() string { return proto.CompactTextString(m) }
+func (*WatchLayer) ProtoMessage()    {}
+func (*WatchLayer) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{4}
+}
+func (m *WatchLayer) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchLayer.Unmarshal(m, b)
+}
+func (m *WatchLayer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchLayer.Marshal(b, m, deterministic)
+}
+func (m *WatchLayer) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchLayer.Merge(m, src)
+}
+func (m *WatchLayer) XXX_Size() int {
+	return xxx_messageInfo_WatchLayer.Size(m)
+}
+func (m *WatchLayer) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchLayer.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchLayer proto.InternalMessageInfo
+
+func (m *WatchLayer) GetDigest() string {
+	if m != nil {
+		return m.Digest
+	}
+	return ""
+}
+
+func (m *WatchLayer) GetTocDigest() string {
+	if m != nil {
+		return m.TocDigest
+	}
+	return ""
+}
+
+func (m *WatchLayer) GetMediaType() string {
+	if m != nil {
+		return m.MediaType
+	}
+	return ""
+}
+
+type WatchRequest struct {
+	Ref    string        `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Layers []*WatchLayer `protobuf:"bytes,2,rep,name=layers,proto3" json:"layers,omitempty"`
+	// Source labels so the daemon can resolve
+	// registry hosts and credentials for the polling loop.
+	Labels map[string]string `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Polling interval. 0 -> daemon default.
+	IntervalSeconds      int64    `protobuf:"varint,4,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	WithBackgroundFetch  bool     `protobuf:"varint,5,opt,name=with_background_fetch,json=withBackgroundFetch,proto3" json:"with_background_fetch,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchRequest) Reset()         { *m = WatchRequest{} }
+func (m *WatchRequest) String() string { return proto.CompactTextString(m) }
+func (*WatchRequest) ProtoMessage()    {}
+func (*WatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{5}
+}
+func (m *WatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchRequest.Unmarshal(m, b)
+}
+func (m *WatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchRequest.Marshal(b, m, deterministic)
+}
+func (m *WatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchRequest.Merge(m, src)
+}
+func (m *WatchRequest) XXX_Size() int {
+	return xxx_messageInfo_WatchRequest.Size(m)
+}
+func (m *WatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchRequest proto.InternalMessageInfo
+
+func (m *WatchRequest) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+func (m *WatchRequest) GetLayers() []*WatchLayer {
+	if m != nil {
+		return m.Layers
+	}
+	return nil
+}
+
+func (m *WatchRequest) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+func (m *WatchRequest) GetIntervalSeconds() int64 {
+	if m != nil {
+		return m.IntervalSeconds
+	}
+	return 0
+}
+
+func (m *WatchRequest) GetWithBackgroundFetch() bool {
+	if m != nil {
+		return m.WithBackgroundFetch
+	}
+	return false
+}
+
+type WatchResponse struct {
+	Error                string   `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchResponse) Reset()         { *m = WatchResponse{} }
+func (m *WatchResponse) String() string { return proto.CompactTextString(m) }
+func (*WatchResponse) ProtoMessage()    {}
+func (*WatchResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{6}
+}
+func (m *WatchResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchResponse.Unmarshal(m, b)
+}
+func (m *WatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchResponse.Marshal(b, m, deterministic)
+}
+func (m *WatchResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchResponse.Merge(m, src)
+}
+func (m *WatchResponse) XXX_Size() int {
+	return xxx_messageInfo_WatchResponse.Size(m)
+}
+func (m *WatchResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchResponse proto.InternalMessageInfo
+
+func (m *WatchResponse) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+type UnwatchRequest struct {
+	Ref                  string   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *UnwatchRequest) Reset()         { *m = UnwatchRequest{} }
+func (m *UnwatchRequest) String() string { return proto.CompactTextString(m) }
+func (*UnwatchRequest) ProtoMessage()    {}
+func (*UnwatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{7}
+}
+func (m *UnwatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UnwatchRequest.Unmarshal(m, b)
+}
+func (m *UnwatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UnwatchRequest.Marshal(b, m, deterministic)
+}
+func (m *UnwatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UnwatchRequest.Merge(m, src)
+}
+func (m *UnwatchRequest) XXX_Size() int {
+	return xxx_messageInfo_UnwatchRequest.Size(m)
+}
+func (m *UnwatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_UnwatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UnwatchRequest proto.InternalMessageInfo
+
+func (m *UnwatchRequest) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+type UnwatchResponse struct {
+	Error                string   `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *UnwatchResponse) Reset()         { *m = UnwatchResponse{} }
+func (m *UnwatchResponse) String() string { return proto.CompactTextString(m) }
+func (*UnwatchResponse) ProtoMessage()    {}
+func (*UnwatchResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{8}
+}
+func (m *UnwatchResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UnwatchResponse.Unmarshal(m, b)
+}
+func (m *UnwatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UnwatchResponse.Marshal(b, m, deterministic)
+}
+func (m *UnwatchResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UnwatchResponse.Merge(m, src)
+}
+func (m *UnwatchResponse) XXX_Size() int {
+	return xxx_messageInfo_UnwatchResponse.Size(m)
+}
+func (m *UnwatchResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_UnwatchResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UnwatchResponse proto.InternalMessageInfo
+
+func (m *UnwatchResponse) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+type WatchListRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchListRequest) Reset()         { *m = WatchListRequest{} }
+func (m *WatchListRequest) String() string { return proto.CompactTextString(m) }
+func (*WatchListRequest) ProtoMessage()    {}
+func (*WatchListRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{9}
+}
+func (m *WatchListRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchListRequest.Unmarshal(m, b)
+}
+func (m *WatchListRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchListRequest.Marshal(b, m, deterministic)
+}
+func (m *WatchListRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchListRequest.Merge(m, src)
+}
+func (m *WatchListRequest) XXX_Size() int {
+	return xxx_messageInfo_WatchListRequest.Size(m)
+}
+func (m *WatchListRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchListRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchListRequest proto.InternalMessageInfo
+
+type WatchEntry struct {
+	Ref                  string   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	LastManifestDigest   string   `protobuf:"bytes,2,opt,name=last_manifest_digest,json=lastManifestDigest,proto3" json:"last_manifest_digest,omitempty"`
+	LastUpdateUnix       int64    `protobuf:"varint,3,opt,name=last_update_unix,json=lastUpdateUnix,proto3" json:"last_update_unix,omitempty"`
+	ConsecutiveFailures  int32    `protobuf:"varint,4,opt,name=consecutive_failures,json=consecutiveFailures,proto3" json:"consecutive_failures,omitempty"`
+	IntervalSeconds      int64    `protobuf:"varint,5,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchEntry) Reset()         { *m = WatchEntry{} }
+func (m *WatchEntry) String() string { return proto.CompactTextString(m) }
+func (*WatchEntry) ProtoMessage()    {}
+func (*WatchEntry) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{10}
+}
+func (m *WatchEntry) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchEntry.Unmarshal(m, b)
+}
+func (m *WatchEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchEntry.Marshal(b, m, deterministic)
+}
+func (m *WatchEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchEntry.Merge(m, src)
+}
+func (m *WatchEntry) XXX_Size() int {
+	return xxx_messageInfo_WatchEntry.Size(m)
+}
+func (m *WatchEntry) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchEntry.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchEntry proto.InternalMessageInfo
+
+func (m *WatchEntry) GetRef() string {
+	if m != nil {
+		return m.Ref
+	}
+	return ""
+}
+
+func (m *WatchEntry) GetLastManifestDigest() string {
+	if m != nil {
+		return m.LastManifestDigest
+	}
+	return ""
+}
+
+func (m *WatchEntry) GetLastUpdateUnix() int64 {
+	if m != nil {
+		return m.LastUpdateUnix
+	}
+	return 0
+}
+
+func (m *WatchEntry) GetConsecutiveFailures() int32 {
+	if m != nil {
+		return m.ConsecutiveFailures
+	}
+	return 0
+}
+
+func (m *WatchEntry) GetIntervalSeconds() int64 {
+	if m != nil {
+		return m.IntervalSeconds
+	}
+	return 0
+}
+
+type WatchListResponse struct {
+	Entries              []*WatchEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
+}
+
+func (m *WatchListResponse) Reset()         { *m = WatchListResponse{} }
+func (m *WatchListResponse) String() string { return proto.CompactTextString(m) }
+func (*WatchListResponse) ProtoMessage()    {}
+func (*WatchListResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0c5120591600887d, []int{11}
+}
+func (m *WatchListResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_WatchListResponse.Unmarshal(m, b)
+}
+func (m *WatchListResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_WatchListResponse.Marshal(b, m, deterministic)
+}
+func (m *WatchListResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchListResponse.Merge(m, src)
+}
+func (m *WatchListResponse) XXX_Size() int {
+	return xxx_messageInfo_WatchListResponse.Size(m)
+}
+func (m *WatchListResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchListResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchListResponse proto.InternalMessageInfo
+
+func (m *WatchListResponse) GetEntries() []*WatchEntry {
+	if m != nil {
+		return m.Entries
+	}
+	return nil
+}
 
 func init() {
-	proto.RegisterType((*RefreshLayerRequest)(nil), "RefreshLayerRequest")
-	proto.RegisterType((*RefreshLayerResponse)(nil), "RefreshLayerResponse")
+	proto.RegisterType((*LayerPair)(nil), "LayerPair")
+	proto.RegisterType((*RefreshImageRequest)(nil), "RefreshImageRequest")
+	proto.RegisterType((*LayerResult)(nil), "LayerResult")
+	proto.RegisterType((*RefreshImageResponse)(nil), "RefreshImageResponse")
+	proto.RegisterType((*WatchLayer)(nil), "WatchLayer")
+	proto.RegisterType((*WatchRequest)(nil), "WatchRequest")
+	proto.RegisterMapType((map[string]string)(nil), "WatchRequest.LabelsEntry")
+	proto.RegisterType((*WatchResponse)(nil), "WatchResponse")
+	proto.RegisterType((*UnwatchRequest)(nil), "UnwatchRequest")
+	proto.RegisterType((*UnwatchResponse)(nil), "UnwatchResponse")
+	proto.RegisterType((*WatchListRequest)(nil), "WatchListRequest")
+	proto.RegisterType((*WatchEntry)(nil), "WatchEntry")
+	proto.RegisterType((*WatchListResponse)(nil), "WatchListResponse")
+}
+
+func init() { proto.RegisterFile("control.proto", fileDescriptor_0c5120591600887d) }
+
+var fileDescriptor_0c5120591600887d = []byte{
+	// 722 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x55, 0xdd, 0x6e, 0xdb, 0x36,
+	0x14, 0x86, 0xec, 0xd9, 0x89, 0x8f, 0x7f, 0xe2, 0x30, 0xce, 0xe0, 0x19, 0x18, 0xe0, 0x29, 0xf3,
+	0xe6, 0x01, 0x9b, 0xb2, 0x78, 0x37, 0x5b, 0x06, 0xec, 0x22, 0x59, 0x03, 0x14, 0x48, 0x81, 0x42,
+	0x49, 0x50, 0xa0, 0x37, 0x02, 0x2d, 0x1d, 0x5b, 0x82, 0x65, 0x4a, 0x25, 0xa9, 0x38, 0xee, 0x63,
+	0xf4, 0xa5, 0xfa, 0x06, 0x45, 0x1f, 0xa7, 0x20, 0x45, 0x29, 0x76, 0x9a, 0xe4, 0xa6, 0x77, 0xe6,
+	0xf9, 0x8e, 0xc8, 0xf3, 0xfd, 0x90, 0x86, 0xb6, 0x9f, 0x30, 0xc9, 0x93, 0xd8, 0x49, 0x79, 0x22,
+	0x13, 0x3b, 0x81, 0xc6, 0x25, 0x5d, 0x23, 0x7f, 0x4d, 0x23, 0x4e, 0x7e, 0x04, 0x48, 0xe2, 0xc0,
+	0x0b, 0xa2, 0x39, 0x0a, 0xd9, 0xb7, 0x86, 0xd6, 0xb8, 0xe1, 0x36, 0x92, 0x38, 0xf8, 0x5f, 0x17,
+	0x14, 0xcc, 0x70, 0x55, 0xc0, 0x95, 0x1c, 0x66, 0xb8, 0x32, 0xf0, 0xcf, 0xd0, 0x51, 0xb0, 0x4c,
+	0xfc, 0xa2, 0xa5, 0xaa, 0x5b, 0x5a, 0x0c, 0x57, 0xd7, 0x89, 0x9f, 0x77, 0xd9, 0x0b, 0x38, 0x70,
+	0x71, 0xc6, 0x51, 0x84, 0x2f, 0x97, 0x74, 0x8e, 0x2e, 0xbe, 0xcb, 0xd4, 0xc7, 0x43, 0xa8, 0xa5,
+	0x34, 0xe2, 0xa2, 0x6f, 0x0d, 0xab, 0xe3, 0xe6, 0x04, 0x9c, 0x72, 0x2a, 0x37, 0x07, 0xc8, 0x04,
+	0x0e, 0x57, 0x91, 0x0c, 0xbd, 0x29, 0xf5, 0x17, 0x73, 0x9e, 0x64, 0x2c, 0xf0, 0x66, 0x28, 0xfd,
+	0x50, 0x0f, 0xb2, 0xeb, 0x1e, 0x28, 0xf0, 0xac, 0xc4, 0x2e, 0x14, 0x64, 0x7f, 0xb4, 0xa0, 0xa9,
+	0x37, 0x72, 0x51, 0x64, 0xb1, 0xfc, 0x46, 0x82, 0x3d, 0xa8, 0x21, 0xe7, 0x09, 0x37, 0xbc, 0xf2,
+	0x05, 0x19, 0xc0, 0xee, 0x8c, 0xc6, 0xb1, 0x1a, 0xab, 0xff, 0x9d, 0x1e, 0xa5, 0x5c, 0x93, 0x11,
+	0x74, 0xfc, 0x90, 0xb2, 0x39, 0x06, 0x9e, 0x1f, 0x66, 0x6c, 0x21, 0xfa, 0xb5, 0xa1, 0x35, 0xae,
+	0xba, 0x6d, 0x53, 0x3d, 0xd7, 0x45, 0xf2, 0x13, 0xb4, 0x68, 0x10, 0xdc, 0x37, 0xd5, 0x75, 0x53,
+	0x53, 0xd7, 0xf2, 0x16, 0xfb, 0x3f, 0xe8, 0x6d, 0xcb, 0x26, 0xd2, 0x84, 0x09, 0x24, 0xbf, 0xc0,
+	0x0e, 0xd7, 0xdc, 0x0a, 0xe5, 0x5a, 0xce, 0x06, 0x61, 0xb7, 0x00, 0xed, 0x29, 0xc0, 0x1b, 0x2a,
+	0xfd, 0x50, 0x83, 0xe4, 0x7b, 0xa8, 0x6f, 0x69, 0x60, 0x56, 0x4a, 0x80, 0x0d, 0xfb, 0x8c, 0x00,
+	0xb2, 0xf0, 0x4e, 0xc1, 0x4b, 0x0c, 0x22, 0xea, 0xc9, 0x75, 0x8a, 0x46, 0x85, 0x86, 0xae, 0x5c,
+	0xaf, 0x53, 0xb4, 0x3f, 0x54, 0xa0, 0xa5, 0x0f, 0x29, 0x4c, 0xed, 0x42, 0x95, 0xe3, 0xcc, 0x9c,
+	0xa1, 0x7e, 0x92, 0x23, 0xa8, 0xc7, 0x6a, 0x02, 0xd1, 0xaf, 0xe8, 0x69, 0x9b, 0xce, 0xfd, 0x54,
+	0xae, 0x81, 0xc8, 0x89, 0x6a, 0x9a, 0x62, 0x2c, 0xfa, 0x55, 0xdd, 0xf4, 0x83, 0xb3, 0xb9, 0xab,
+	0x73, 0xa9, 0xb1, 0x17, 0x4c, 0xf2, 0xb5, 0x6b, 0x1a, 0xc9, 0x6f, 0xd0, 0x8d, 0x98, 0x44, 0x7e,
+	0x4b, 0x63, 0x4f, 0xa0, 0x9f, 0xb0, 0x40, 0x68, 0x33, 0xaa, 0xee, 0x5e, 0x51, 0xbf, 0xca, 0xcb,
+	0x4f, 0xe7, 0xa8, 0xf6, 0x64, 0x8e, 0x06, 0xff, 0xa8, 0x18, 0x95, 0xa7, 0x2a, 0x5e, 0x0b, 0x5c,
+	0x17, 0xbc, 0x16, 0xb8, 0x56, 0xd1, 0xb8, 0xa5, 0x71, 0x86, 0x46, 0xb3, 0x7c, 0x71, 0x5a, 0xf9,
+	0xdb, 0xb2, 0x47, 0xd0, 0x36, 0xd3, 0x1b, 0xc7, 0xca, 0x14, 0x59, 0x1b, 0x29, 0xb2, 0x6d, 0xe8,
+	0xdc, 0xb0, 0xd5, 0xb3, 0xe2, 0xd9, 0xbf, 0xc2, 0x5e, 0xd9, 0xf3, 0xec, 0x66, 0x04, 0xba, 0xb9,
+	0xac, 0x91, 0x90, 0x66, 0x3b, 0xfb, 0xb3, 0x65, 0x12, 0x50, 0x52, 0x78, 0x60, 0xcd, 0x9f, 0xd0,
+	0x8b, 0xa9, 0x90, 0xde, 0x92, 0xb2, 0x68, 0x86, 0x42, 0x6e, 0xa7, 0x80, 0x28, 0xec, 0x95, 0x81,
+	0x4c, 0x1c, 0xc6, 0xd0, 0xd5, 0x5f, 0x64, 0x69, 0x40, 0x25, 0x7a, 0x19, 0x8b, 0xee, 0x74, 0x28,
+	0xaa, 0x6e, 0x47, 0xd5, 0x6f, 0x74, 0xf9, 0x86, 0x45, 0x77, 0xe4, 0x04, 0x7a, 0xbe, 0x9a, 0xd7,
+	0xcf, 0x64, 0x74, 0x8b, 0xde, 0x8c, 0x46, 0x71, 0xc6, 0x31, 0xb7, 0xa8, 0xe6, 0x1e, 0x6c, 0x60,
+	0x17, 0x06, 0x7a, 0xd4, 0xd1, 0xda, 0xa3, 0x8e, 0xda, 0xa7, 0xb0, 0xbf, 0x41, 0xd7, 0x28, 0x33,
+	0x82, 0x1d, 0x64, 0x92, 0x47, 0x58, 0x5c, 0x0c, 0x13, 0xb5, 0x3c, 0x37, 0x05, 0x36, 0xf9, 0x64,
+	0x41, 0xfb, 0x4a, 0x52, 0x3e, 0x7f, 0x7f, 0x9e, 0xbf, 0x8b, 0xe4, 0x5f, 0x68, 0x6d, 0xde, 0x34,
+	0xd2, 0x73, 0x1e, 0x79, 0xaf, 0x06, 0x87, 0xce, 0x13, 0xd7, 0xb1, 0xa6, 0x4f, 0x21, 0xed, 0xad,
+	0xcc, 0x0e, 0x3a, 0xce, 0x76, 0x08, 0x7e, 0x87, 0x1d, 0x63, 0x25, 0xd9, 0x73, 0xb6, 0x8d, 0x1f,
+	0x74, 0x9d, 0x87, 0x2e, 0x4f, 0xa0, 0x51, 0x12, 0x24, 0xfb, 0xce, 0x43, 0x6f, 0x07, 0xc4, 0xf9,
+	0x8a, 0xff, 0xd9, 0xe8, 0xed, 0xd1, 0x3c, 0x92, 0x61, 0x36, 0x75, 0xfc, 0x64, 0x79, 0x2c, 0x34,
+	0xc5, 0x3f, 0x04, 0xa3, 0xa9, 0x08, 0x13, 0x29, 0x91, 0x1f, 0xcf, 0xc4, 0x71, 0x3a, 0x9d, 0xd6,
+	0xf5, 0xdf, 0xc0, 0x5f, 0x5f, 0x02, 0x00, 0x00, 0xff, 0xff, 0x6c, 0xff, 0xe7, 0x7a, 0x17, 0x06,
+	0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -116,8 +702,13 @@ var _ grpc.ClientConn
 const _ = grpc.SupportPackageIsVersion4
 
 // StargzControlClient is the client API for StargzControl service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type StargzControlClient interface {
-	RefreshLayer(ctx context.Context, in *RefreshLayerRequest, opts ...grpc.CallOption) (*RefreshLayerResponse, error)
+	RefreshImage(ctx context.Context, in *RefreshImageRequest, opts ...grpc.CallOption) (*RefreshImageResponse, error)
+	Watch(ctx context.Context, in *WatchRequest, opts ...grpc.CallOption) (*WatchResponse, error)
+	Unwatch(ctx context.Context, in *UnwatchRequest, opts ...grpc.CallOption) (*UnwatchResponse, error)
+	WatchList(ctx context.Context, in *WatchListRequest, opts ...grpc.CallOption) (*WatchListResponse, error)
 }
 
 type stargzControlClient struct {
@@ -128,9 +719,36 @@ func NewStargzControlClient(cc *grpc.ClientConn) StargzControlClient {
 	return &stargzControlClient{cc}
 }
 
-func (c *stargzControlClient) RefreshLayer(ctx context.Context, in *RefreshLayerRequest, opts ...grpc.CallOption) (*RefreshLayerResponse, error) {
-	out := new(RefreshLayerResponse)
-	err := c.cc.Invoke(ctx, "/StargzControl/RefreshLayer", in, out, opts...)
+func (c *stargzControlClient) RefreshImage(ctx context.Context, in *RefreshImageRequest, opts ...grpc.CallOption) (*RefreshImageResponse, error) {
+	out := new(RefreshImageResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/RefreshImage", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stargzControlClient) Watch(ctx context.Context, in *WatchRequest, opts ...grpc.CallOption) (*WatchResponse, error) {
+	out := new(WatchResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/Watch", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stargzControlClient) Unwatch(ctx context.Context, in *UnwatchRequest, opts ...grpc.CallOption) (*UnwatchResponse, error) {
+	out := new(UnwatchResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/Unwatch", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stargzControlClient) WatchList(ctx context.Context, in *WatchListRequest, opts ...grpc.CallOption) (*WatchListResponse, error) {
+	out := new(WatchListResponse)
+	err := c.cc.Invoke(ctx, "/StargzControl/WatchList", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,35 +757,101 @@ func (c *stargzControlClient) RefreshLayer(ctx context.Context, in *RefreshLayer
 
 // StargzControlServer is the server API for StargzControl service.
 type StargzControlServer interface {
-	RefreshLayer(context.Context, *RefreshLayerRequest) (*RefreshLayerResponse, error)
+	RefreshImage(context.Context, *RefreshImageRequest) (*RefreshImageResponse, error)
+	Watch(context.Context, *WatchRequest) (*WatchResponse, error)
+	Unwatch(context.Context, *UnwatchRequest) (*UnwatchResponse, error)
+	WatchList(context.Context, *WatchListRequest) (*WatchListResponse, error)
 }
 
 // UnimplementedStargzControlServer can be embedded to have forward compatible implementations.
 type UnimplementedStargzControlServer struct {
 }
 
-func (*UnimplementedStargzControlServer) RefreshLayer(ctx context.Context, req *RefreshLayerRequest) (*RefreshLayerResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RefreshLayer not implemented")
+func (*UnimplementedStargzControlServer) RefreshImage(ctx context.Context, req *RefreshImageRequest) (*RefreshImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RefreshImage not implemented")
+}
+func (*UnimplementedStargzControlServer) Watch(ctx context.Context, req *WatchRequest) (*WatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Watch not implemented")
+}
+func (*UnimplementedStargzControlServer) Unwatch(ctx context.Context, req *UnwatchRequest) (*UnwatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unwatch not implemented")
+}
+func (*UnimplementedStargzControlServer) WatchList(ctx context.Context, req *WatchListRequest) (*WatchListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WatchList not implemented")
 }
 
 func RegisterStargzControlServer(s *grpc.Server, srv StargzControlServer) {
 	s.RegisterService(&_StargzControl_serviceDesc, srv)
 }
 
-func _StargzControl_RefreshLayer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RefreshLayerRequest)
+func _StargzControl_RefreshImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshImageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StargzControlServer).RefreshLayer(ctx, in)
+		return srv.(StargzControlServer).RefreshImage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/StargzControl/RefreshLayer",
+		FullMethod: "/StargzControl/RefreshImage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StargzControlServer).RefreshLayer(ctx, req.(*RefreshLayerRequest))
+		return srv.(StargzControlServer).RefreshImage(ctx, req.(*RefreshImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StargzControl_Watch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).Watch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/Watch",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).Watch(ctx, req.(*WatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StargzControl_Unwatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnwatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).Unwatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/Unwatch",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).Unwatch(ctx, req.(*UnwatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StargzControl_WatchList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WatchListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StargzControlServer).WatchList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/StargzControl/WatchList",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StargzControlServer).WatchList(ctx, req.(*WatchListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -177,8 +861,20 @@ var _StargzControl_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*StargzControlServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RefreshLayer",
-			Handler:    _StargzControl_RefreshLayer_Handler,
+			MethodName: "RefreshImage",
+			Handler:    _StargzControl_RefreshImage_Handler,
+		},
+		{
+			MethodName: "Watch",
+			Handler:    _StargzControl_Watch_Handler,
+		},
+		{
+			MethodName: "Unwatch",
+			Handler:    _StargzControl_Unwatch_Handler,
+		},
+		{
+			MethodName: "WatchList",
+			Handler:    _StargzControl_WatchList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

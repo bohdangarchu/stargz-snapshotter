@@ -21,6 +21,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/containerd/stargz-snapshotter/estargz"
@@ -113,12 +114,25 @@ func assignIDs(er *estargz.Reader, e *estargz.TOCEntry) (rootID uint32, idMap ma
 			idOfEntry[e.Name] = id
 		}
 
-		e.ForeachChild(func(_ string, ent *estargz.TOCEntry) bool {
-			_, err = mapChildren(ent)
-			return err == nil
+		// Walk children in sorted order so that ids are a deterministic
+		// function of the tree structure across independent loads of the
+		// same TOC. Without this, range over e.children (a Go map) yields
+		// children in randomized order, which gives different files
+		// different ids on every load
+		type childEnt struct {
+			name string
+			ent  *estargz.TOCEntry
+		}
+		var children []childEnt
+		e.ForeachChild(func(name string, ent *estargz.TOCEntry) bool {
+			children = append(children, childEnt{name, ent})
+			return true
 		})
-		if err != nil {
-			return 0, err
+		sort.Slice(children, func(i, j int) bool { return children[i].name < children[j].name })
+		for _, c := range children {
+			if _, err = mapChildren(c.ent); err != nil {
+				return 0, err
+			}
 		}
 		return id, nil
 	}
