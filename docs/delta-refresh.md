@@ -8,8 +8,6 @@ Refresh a running image to a newer version of itself by fetching only the chunks
 
 `ctr-remote refresh <old-ref> <new-ref>` is the explicit form.
 
-`ctr-remote refresh-layer <old-digest> <new-digest>` (older, per-layer) still exists.
-
 `--with-background-fetch` re-pulls the changed/added chunks of every refreshed layer in the background after the swap.
 
 ## Per-layer flow
@@ -19,7 +17,7 @@ Refresh a running image to a newer version of itself by fetching only the chunks
 3. **Refresh attrs on changed files.** Changed-file ids are surfaced as `DeltaResult.ChangedFiles`. After the reader swap, each affected node's `Attr` is reloaded from the new metadata reader and `NotifyEntry(name)` is sent on the parent so the kernel drops its cached dentry+attrs. Without this, `stat()` returns the v0 `Size` and the kernel clamps reads to the old `i_size`, silently truncating when v1 is larger.
 4. **Scope background fetch.** When `--with-background-fetch` is set, fetch only the changed/added chunk ranges, not the whole new blob.
 
-The reader-swap and lock structure are the same as the per-layer command. The on-disk cache format is unchanged.
+The on-disk cache format is unchanged across a refresh.
 
 `node.attr` is an `atomic.Pointer[metadata.Attr]` so the post-swap attr update is lock-free against concurrent FUSE handlers.
 
@@ -50,7 +48,7 @@ If needed later, the extension is additive: include an attr fingerprint in `entr
 
 ## Drift from containerd's image record
 
-Refresh updates only the daemon's in-memory layer state (`l.desc` is overwritten). Containerd's image manifest is not touched, so after a refresh `ctr images ls` still shows the original digests. Same drift as the per-layer command. Reconciling means writing back to containerd's image store — content-store handling, image-service API, error recovery if write-back fails mid-flight. Out of scope.
+Refresh updates only the daemon's in-memory layer state (`l.desc` is overwritten). Containerd's image manifest is not touched, so after a refresh `ctr images ls` still shows the original digests. Reconciling means writing back to containerd's image store — content-store handling, image-service API, error recovery if write-back fails mid-flight. Out of scope.
 
 ## Out of scope
 
